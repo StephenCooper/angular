@@ -1,9 +1,10 @@
 // Imports
-import fetch from 'node-fetch';
+import fetch, {RequestInit} from 'node-fetch';
+
 import {assertNotMissingOrEmpty} from './utils';
 
 // Constants
-const CIRCLE_CI_API_URL = 'https://circleci.com/api/v1.1/project/github';
+const CIRCLE_CI_API_URL = 'https://circleci.com/api/v2/project/gh';
 
 // Interfaces - Types
 export interface ArtifactInfo {
@@ -22,8 +23,8 @@ export interface BuildInfo {
   username: string;
   build_num: number;
   has_artifacts: boolean;
-  outcome: string; // e.g. 'success'
-  vcs_revision: string; // HEAD SHA
+  outcome: string;       // e.g. 'success'
+  vcs_revision: string;  // HEAD SHA
   // there are other fields but they are not used in this code
 }
 
@@ -31,23 +32,30 @@ export interface BuildInfo {
  * A Helper that can interact with the CircleCI API.
  */
 export class CircleCiApi {
-
-  private tokenParam = `circle-token=${this.circleCiToken}`;
-
   /**
    * Construct a helper that can interact with the CircleCI REST API.
-   * @param githubOrg The Github organisation whose repos we want to access in CircleCI (e.g. angular).
+   * @param githubOrg The Github organisation whose repos we want to access in CircleCI (e.g.
+   *     angular).
    * @param githubRepo The Github repo whose builds we want to access in CircleCI (e.g. angular).
    * @param circleCiToken The CircleCI API access token (secret).
    */
   constructor(
-    private githubOrg: string,
-    private githubRepo: string,
-    private circleCiToken: string,
+      private githubOrg: string,
+      private githubRepo: string,
+      private circleCiToken: string,
   ) {
     assertNotMissingOrEmpty('githubOrg', githubOrg);
     assertNotMissingOrEmpty('githubRepo', githubRepo);
     assertNotMissingOrEmpty('circleCiToken', circleCiToken);
+  }
+
+  public  async fetchFromCircleCi(url: string, params: RequestInit = {}) {
+    params.headers = {...params.headers, 'Circle-Token': this.circleCiToken};
+    const response = await fetch(url, params);
+    if (response.status !== 200) {
+      throw new Error(`${url}: ${response.status} - ${response.statusText}`);
+    }
+    return response;
   }
 
   /**
@@ -57,14 +65,11 @@ export class CircleCiApi {
    */
   public async getBuildInfo(buildNumber: number): Promise<BuildInfo> {
     try {
-      const baseUrl = `${CIRCLE_CI_API_URL}/${this.githubOrg}/${this.githubRepo}/${buildNumber}`;
-      const response = await fetch(`${baseUrl}?${this.tokenParam}`);
-      if (response.status !== 200) {
-        throw new Error(`${baseUrl}: ${response.status} - ${response.statusText}`);
-      }
+      const url = `${CIRCLE_CI_API_URL}/${this.githubOrg}/${this.githubRepo}/job/${buildNumber}`;
+      const response = await this.fetchFromCircleCi(url);
       return response.json();
     } catch (error) {
-        throw new Error(`CircleCI build info request failed (${error.message})`);
+      throw new Error(`CircleCI build info request failed (${(error as Error).message})`);
     }
   }
 
@@ -76,15 +81,15 @@ export class CircleCiApi {
   public async getBuildArtifactUrl(buildNumber: number, artifactPath: string): Promise<string> {
     const baseUrl = `${CIRCLE_CI_API_URL}/${this.githubOrg}/${this.githubRepo}/${buildNumber}`;
     try {
-      const response = await fetch(`${baseUrl}/artifacts?${this.tokenParam}`);
-      const artifacts = await response.json() as ArtifactResponse;
-      const artifact = artifacts.find(item => item.path === artifactPath);
+      const response = await this.fetchFromCircleCi(`${baseUrl}/artifacts`);
+      const artifacts = await response.json() as {items: ArtifactResponse};
+      const artifact = artifacts.items.find(item => item.path === artifactPath);
       if (!artifact) {
         throw new Error(`Missing artifact (${artifactPath}) for CircleCI build: ${buildNumber}`);
       }
       return artifact.url;
     } catch (error) {
-      throw new Error(`CircleCI artifact URL request failed (${error.message})`);
+      throw new Error(`CircleCI artifact URL request failed (${(error as Error).message})`);
     }
   }
 }

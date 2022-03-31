@@ -1,24 +1,32 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {CustomTransformers, Program, defaultGatherDiagnostics} from '@angular/compiler-cli';
+import {CustomTransformers, defaultGatherDiagnostics, Program} from '@angular/compiler-cli';
 import * as api from '@angular/compiler-cli/src/transformers/api';
-import * as ts from 'typescript';
+import * as tsickle from 'tsickle';
+import ts from 'typescript';
 
-import {createCompilerHost, createProgram} from '../../ngtools2';
+import {createCompilerHost, createProgram} from '../../index';
+import {mainXi18n} from '../../src/extract_i18n';
 import {main, mainDiagnosticsForTest, readNgcCommandLineAndConfiguration} from '../../src/main';
-import {AbsoluteFsPath, FileSystem, NgtscCompilerHost, absoluteFrom, getFileSystem} from '../../src/ngtsc/file_system';
+import {absoluteFrom, AbsoluteFsPath, FileSystem, getFileSystem, relativeFrom} from '../../src/ngtsc/file_system';
 import {Folder, MockFileSystem} from '../../src/ngtsc/file_system/testing';
 import {IndexedComponent} from '../../src/ngtsc/indexer';
 import {NgtscProgram} from '../../src/ngtsc/program';
-import {LazyRoute} from '../../src/ngtsc/routing';
+import {DeclarationNode} from '../../src/ngtsc/reflection';
+import {NgtscTestCompilerHost} from '../../src/ngtsc/testing';
 import {setWrapHostForTest} from '../../src/transformers/compiler_host';
 
+type TsConfigOptionsValue =
+    string|boolean|number|null|TsConfigOptionsValue[]|{[key: string]: TsConfigOptionsValue};
+type TsConfigOptions = {
+  [key: string]: TsConfigOptionsValue;
+};
 
 /**
  * Manages a temporary testing directory structure and environment for testing ngtsc by feeding it
@@ -28,6 +36,7 @@ export class NgtscTestEnvironment {
   private multiCompileHostExt: MultiCompileHostExt|null = null;
   private oldProgram: Program|null = null;
   private changedResources: Set<string>|null = null;
+  private commandLineArgs = ['-p', this.basePath];
 
   private constructor(
       private fs: FileSystem, readonly outDir: AbsoluteFsPath, readonly basePath: AbsoluteFsPath) {}
@@ -35,7 +44,8 @@ export class NgtscTestEnvironment {
   /**
    * Set up a new testing environment.
    */
-  static setup(files?: Folder): NgtscTestEnvironment {
+  static setup(files?: Folder, workingDir: AbsoluteFsPath = absoluteFrom('/')):
+      NgtscTestEnvironment {
     const fs = getFileSystem();
     if (files !== undefined && fs instanceof MockFileSystem) {
       fs.init(files);
@@ -44,29 +54,31 @@ export class NgtscTestEnvironment {
     const host = new AugmentedCompilerHost(fs);
     setWrapHostForTest(makeWrapHost(host));
 
-    const env = new NgtscTestEnvironment(fs, fs.resolve('/built'), absoluteFrom('/'));
+    const env = new NgtscTestEnvironment(fs, fs.resolve('/built'), workingDir);
+    fs.chdir(workingDir);
 
     env.write(absoluteFrom('/tsconfig-base.json'), `{
       "compilerOptions": {
-        "emitDecoratorMetadata": true,
+        "emitDecoratorMetadata": false,
         "experimentalDecorators": true,
         "skipLibCheck": true,
         "noImplicitAny": true,
+        "noEmitOnError": true,
         "strictNullChecks": true,
         "outDir": "built",
         "rootDir": ".",
         "baseUrl": ".",
+        "allowJs": true,
         "declaration": true,
-        "target": "es5",
+        "target": "es2015",
         "newLine": "lf",
         "module": "es2015",
         "moduleResolution": "node",
-        "lib": ["es6", "dom"],
+        "lib": ["es2015", "dom"],
         "typeRoots": ["node_modules/@types"]
       },
       "angularCompilerOptions": {
         "enableIvy": true,
-        "ivyTemplateTypeCheck": false
       },
       "exclude": [
         "built"
@@ -109,19 +121,39 @@ export class NgtscTestEnvironment {
     setWrapHostForTest(makeWrapHost(new ResourceLoadingCompileHost(this.fs)));
   }
 
+  addCommandLineArgs(...args: string[]): void {
+    this.commandLineArgs.push(...args);
+  }
+
   flushWrittenFileTracking(): void {
     if (this.multiCompileHostExt === null) {
       throw new Error(`Not tracking written files - call enableMultipleCompilations()`);
     }
-    this.changedResources !.clear();
+    this.changedResources!.clear();
     this.multiCompileHostExt.flushWrittenFileTracking();
+  }
+
+  getTsProgram(): ts.Program {
+    if (this.oldProgram === null) {
+      throw new Error('No ts.Program has been created yet.');
+    }
+    return this.oldProgram.getTsProgram();
+  }
+
+  getReuseTsProgram(): ts.Program {
+    if (this.oldProgram === null) {
+      throw new Error('No ts.Program has been created yet.');
+    }
+    return (this.oldProgram as NgtscProgram).getReuseTsProgram();
   }
 
   /**
    * Older versions of the CLI do not provide the `CompilerHost.getModifiedResourceFiles()` method.
    * This results in the `changedResources` set being `null`.
    */
-  simulateLegacyCLICompilerHost() { this.changedResources = null; }
+  simulateLegacyCLICompilerHost() {
+    this.changedResources = null;
+  }
 
   getFilesWrittenSinceLastFlush(): Set<string> {
     if (this.multiCompileHostExt === null) {
@@ -130,7 +162,7 @@ export class NgtscTestEnvironment {
     const writtenFiles = new Set<string>();
     this.multiCompileHostExt.getFilesWrittenSinceLastFlush().forEach(rawFile => {
       if (rawFile.startsWith(this.outDir)) {
-        writtenFiles.add(rawFile.substr(this.outDir.length));
+        writtenFiles.add(rawFile.slice(this.outDir.length));
       }
     });
     return writtenFiles;
@@ -140,7 +172,9 @@ export class NgtscTestEnvironment {
     const absFilePath = this.fs.resolve(this.basePath, fileName);
     if (this.multiCompileHostExt !== null) {
       this.multiCompileHostExt.invalidate(absFilePath);
-      this.changedResources !.add(absFilePath);
+      if (!fileName.endsWith('.ts')) {
+        this.changedResources!.add(absFilePath);
+      }
     }
     this.fs.ensureDir(this.fs.dirname(absFilePath));
     this.fs.writeFile(absFilePath, content);
@@ -152,14 +186,19 @@ export class NgtscTestEnvironment {
       throw new Error(`Not caching files - call enableMultipleCompilations()`);
     }
     this.multiCompileHostExt.invalidate(absFilePath);
+    if (!fileName.endsWith('.ts')) {
+      this.changedResources!.add(absFilePath);
+    }
   }
 
-  tsconfig(extraOpts: {[key: string]: string | boolean | null} = {}, extraRootDirs?: string[]):
-      void {
+  tsconfig(extraOpts: TsConfigOptions = {}, extraRootDirs?: string[], files?: string[]): void {
     const tsconfig: {[key: string]: any} = {
       extends: './tsconfig-base.json',
       angularCompilerOptions: {...extraOpts, enableIvy: true},
     };
+    if (files !== undefined) {
+      tsconfig['files'] = files;
+    }
     if (extraRootDirs !== undefined) {
       tsconfig.compilerOptions = {
         rootDirs: ['.', ...extraRootDirs],
@@ -177,32 +216,53 @@ export class NgtscTestEnvironment {
    */
   driveMain(customTransformers?: CustomTransformers): void {
     const errorSpy = jasmine.createSpy('consoleError').and.callFake(console.error);
-    let reuseProgram: {program: Program | undefined}|undefined = undefined;
+    let reuseProgram: {program: Program|undefined}|undefined = undefined;
     if (this.multiCompileHostExt !== null) {
       reuseProgram = {
         program: this.oldProgram || undefined,
       };
     }
     const exitCode = main(
-        ['-p', this.basePath], errorSpy, undefined, customTransformers, reuseProgram,
-        this.changedResources);
+        this.commandLineArgs, errorSpy, undefined, customTransformers, reuseProgram,
+        this.changedResources, tsickle);
     expect(errorSpy).not.toHaveBeenCalled();
     expect(exitCode).toBe(0);
     if (this.multiCompileHostExt !== null) {
-      this.oldProgram = reuseProgram !.program !;
+      this.oldProgram = reuseProgram!.program!;
     }
   }
 
   /**
    * Run the compiler to completion, and return any `ts.Diagnostic` errors that may have occurred.
    */
-  driveDiagnostics(): ReadonlyArray<ts.Diagnostic> {
+  driveDiagnostics(expectedExitCode?: number): ReadonlyArray<ts.Diagnostic> {
     // ngtsc only produces ts.Diagnostic messages.
-    return mainDiagnosticsForTest(['-p', this.basePath]) as ts.Diagnostic[];
+    let reuseProgram: {program: Program|undefined}|undefined = undefined;
+    if (this.multiCompileHostExt !== null) {
+      reuseProgram = {
+        program: this.oldProgram || undefined,
+      };
+    }
+
+    const {exitCode, diagnostics} = mainDiagnosticsForTest(
+        this.commandLineArgs, undefined, reuseProgram, this.changedResources, tsickle);
+    if (expectedExitCode !== undefined) {
+      expect(exitCode)
+          .withContext(`Expected program to exit with code ${
+              expectedExitCode}, but it actually exited with code ${exitCode}.`)
+          .toBe(expectedExitCode);
+    }
+
+    if (this.multiCompileHostExt !== null) {
+      this.oldProgram = reuseProgram!.program!;
+    }
+
+    // In ngtsc, only `ts.Diagnostic`s are produced.
+    return diagnostics as ReadonlyArray<ts.Diagnostic>;
   }
 
   async driveDiagnosticsAsync(): Promise<ReadonlyArray<ts.Diagnostic>> {
-    const {rootNames, options} = readNgcCommandLineAndConfiguration(['-p', this.basePath]);
+    const {rootNames, options} = readNgcCommandLineAndConfiguration(this.commandLineArgs);
     const host = createCompilerHost({options});
     const program = createProgram({rootNames, host, options});
     await program.loadNgStructureAsync();
@@ -211,30 +271,58 @@ export class NgtscTestEnvironment {
     return defaultGatherDiagnostics(program as api.Program) as ts.Diagnostic[];
   }
 
-  driveRoutes(entryPoint?: string): LazyRoute[] {
-    const {rootNames, options} = readNgcCommandLineAndConfiguration(['-p', this.basePath]);
-    const host = createCompilerHost({options});
-    const program = createProgram({rootNames, host, options});
-    return program.listLazyRoutes(entryPoint);
-  }
-
-  driveIndexer(): Map<ts.Declaration, IndexedComponent> {
-    const {rootNames, options} = readNgcCommandLineAndConfiguration(['-p', this.basePath]);
+  driveIndexer(): Map<DeclarationNode, IndexedComponent> {
+    const {rootNames, options} = readNgcCommandLineAndConfiguration(this.commandLineArgs);
     const host = createCompilerHost({options});
     const program = createProgram({rootNames, host, options});
     return (program as NgtscProgram).getIndexedComponents();
   }
+
+  driveXi18n(format: string, outputFileName: string, locale: string|null = null): void {
+    const errorSpy = jasmine.createSpy('consoleError').and.callFake(console.error);
+    const args = [
+      ...this.commandLineArgs,
+      `--i18nFormat=${format}`,
+      `--outFile=${outputFileName}`,
+    ];
+    if (locale !== null) {
+      args.push(`--locale=${locale}`);
+    }
+    const exitCode = mainXi18n(args, errorSpy);
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(exitCode).toEqual(0);
+  }
 }
 
-class AugmentedCompilerHost extends NgtscCompilerHost {
-  delegate !: ts.CompilerHost;
+class AugmentedCompilerHost extends NgtscTestCompilerHost {
+  delegate!: ts.CompilerHost;
 }
+
+const ROOT_PREFIX = 'root/';
 
 class FileNameToModuleNameHost extends AugmentedCompilerHost {
   fileNameToModuleName(importedFilePath: string): string {
-    const relativeFilePath = this.fs.relative(this.fs.pwd(), this.fs.resolve(importedFilePath));
+    const relativeFilePath =
+        relativeFrom(this.fs.relative(this.fs.pwd(), this.fs.resolve(importedFilePath)));
     const rootedPath = this.fs.join('root', relativeFilePath);
     return rootedPath.replace(/(\.d)?.ts$/, '');
+  }
+
+  resolveModuleNames(
+      moduleNames: string[], containingFile: string, reusedNames: string[]|undefined,
+      redirectedReference: ts.ResolvedProjectReference|undefined,
+      options: ts.CompilerOptions): (ts.ResolvedModule|undefined)[] {
+    return moduleNames.map(moduleName => {
+      if (moduleName.startsWith(ROOT_PREFIX)) {
+        // Strip the artificially added root prefix.
+        moduleName = '/' + moduleName.slice(ROOT_PREFIX.length);
+      }
+
+      return ts
+          .resolveModuleName(
+              moduleName, containingFile, options, this, /* cache */ undefined, redirectedReference)
+          .resolvedModule;
+    });
   }
 }
 
@@ -242,11 +330,11 @@ class MultiCompileHostExt extends AugmentedCompilerHost implements Partial<ts.Co
   private cache = new Map<string, ts.SourceFile>();
   private writtenFiles = new Set<string>();
 
-  getSourceFile(
+  override getSourceFile(
       fileName: string, languageVersion: ts.ScriptTarget, onError?: (message: string) => void,
       shouldCreateNewSourceFile?: boolean): ts.SourceFile|undefined {
     if (this.cache.has(fileName)) {
-      return this.cache.get(fileName) !;
+      return this.cache.get(fileName)!;
     }
     const sf = super.getSourceFile(fileName, languageVersion);
     if (sf !== undefined) {
@@ -255,9 +343,11 @@ class MultiCompileHostExt extends AugmentedCompilerHost implements Partial<ts.Co
     return sf;
   }
 
-  flushWrittenFileTracking(): void { this.writtenFiles.clear(); }
+  flushWrittenFileTracking(): void {
+    this.writtenFiles.clear();
+  }
 
-  writeFile(
+  override writeFile(
       fileName: string, data: string, writeByteOrderMark: boolean,
       onError: ((message: string) => void)|undefined,
       sourceFiles?: ReadonlyArray<ts.SourceFile>): void {
@@ -265,9 +355,13 @@ class MultiCompileHostExt extends AugmentedCompilerHost implements Partial<ts.Co
     this.writtenFiles.add(fileName);
   }
 
-  getFilesWrittenSinceLastFlush(): Set<string> { return this.writtenFiles; }
+  getFilesWrittenSinceLastFlush(): Set<string> {
+    return this.writtenFiles;
+  }
 
-  invalidate(fileName: string): void { this.cache.delete(fileName); }
+  invalidate(fileName: string): void {
+    this.cache.delete(fileName);
+  }
 }
 
 class ResourceLoadingCompileHost extends AugmentedCompilerHost implements api.CompilerHost {
@@ -286,7 +380,7 @@ function makeWrapHost(wrapped: AugmentedCompilerHost): (host: ts.CompilerHost) =
     return new Proxy(delegate, {
       get: (target: ts.CompilerHost, name: string): any => {
         if ((wrapped as any)[name] !== undefined) {
-          return (wrapped as any)[name] !.bind(wrapped);
+          return (wrapped as any)[name]!.bind(wrapped);
         }
         return (target as any)[name];
       }

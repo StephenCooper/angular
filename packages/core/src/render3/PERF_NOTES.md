@@ -14,8 +14,8 @@ shown here: https://jsperf.com/small-arrays-vs-linked-objects
 ## Monomorphic vs Megamorphic code
 
 Great reads:
-- [What's up with monomorphism?](http://mrale.ph/blog/2015/01/11/whats-up-with-monomorphism.html)
-- [Impact of polymorphism on component-based frameworks like React](http://benediktmeurer.de/2018/03/23/impact-of-polymorphism-on-component-based-frameworks-like-react/)
+- [What's up with monomorphism?](https://mrale.ph/blog/2015/01/11/whats-up-with-monomorphism.html)
+- [Impact of polymorphism on component-based frameworks like React](https://benediktmeurer.de/2018/03/23/impact-of-polymorphism-on-component-based-frameworks-like-react/)
 
 1) Monomorphic prop access is 100 times faster than megamorphic.
 2) Monomorphic call is 4 times faster the megamorphic call.
@@ -97,24 +97,24 @@ Here is an example of code which breaks the inlining and a way to fix it.
 ```
 export function i18nStart(index: number, message: string, subTemplateIndex?: number): void {
   const tView = getTView();
-  if (tView.firstTemplatePass && tView.data[index + HEADER_OFFSET] === null) {
+  if (tView.firstCreatePass && tView.data[index + HEADER_OFFSET] === null) {
     // LOTS OF CODE HERE WHICH PREVENTS INLINING.
   }
 }
 ```
 
-Notice that the above function almost never runs because `tView.firstTemplatePass` is usually false.
+Notice that the above function almost never runs because `tView.firstCreatePass` is usually false.
 The application would benefit from inlining, but the large code inside `if` prevents it.
 Simple refactoring will fix it.
 
 ```
 export function i18nStart(index: number, message: string, subTemplateIndex?: number): void {
   const tView = getTView();
-  if (tView.firstTemplatePass && tView.data[index + HEADER_OFFSET] === null) {
-    i18nStartFirstTemplatePass(tView, index, message, subTemplateIndex)
+  if (tView.firstCreatePass && tView.data[index + HEADER_OFFSET] === null) {
+    i18nStartfirstCreatePass(tView, index, message, subTemplateIndex)
   }
 }
-export function i18nStartFirstTemplatePass(tView: TView, index: number, message: string, subTemplateIndex?: number): void {
+export function i18nStartfirstCreatePass(tView: TView, index: number, message: string, subTemplateIndex?: number): void {
   // LOTS OF CODE HERE WHICH PREVENTS INLINING.
 }
 ```

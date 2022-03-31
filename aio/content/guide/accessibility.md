@@ -10,14 +10,20 @@ For an in-depth introduction to issues and techniques for designing accessible a
 This page discusses best practices for designing Angular applications that
 work well for all users, including those who rely on assistive technologies.
 
+<div class="alert is-helpful">
+
+  For the sample application that this page describes, see the <live-example></live-example>.
+
+</div>
+
 ## Accessibility attributes
 
 Building accessible web experience often involves setting [ARIA attributes](https://developers.google.com/web/fundamentals/accessibility/semantics-aria)
 to provide semantic meaning where it might otherwise be missing.
-Use [attribute binding](guide/template-syntax#attribute-binding) template syntax to control the values of accessibility-related attributes.
+Use [attribute binding](guide/attribute-binding) template syntax to control the values of accessibility-related attributes.
 
 When binding to ARIA attributes in Angular, you must use the `attr.` prefix, as the ARIA
-specification depends specifically on HTML attributes rather than properties on DOM elements.
+specification depends specifically on HTML attributes rather than properties of DOM elements.
 
 ```html
 <!-- Use attr. when binding to an ARIA attribute -->
@@ -32,13 +38,11 @@ Static ARIA attributes require no extra syntax.
 <button aria-label="Save document">...</button>
 ```
 
-NOTE:
-
 <div class="alert is-helpful">
 
    By convention, HTML attributes use lowercase names (`tabindex`), while properties use camelCase names (`tabIndex`).
 
-   See the [Template Syntax](https://angular.io/guide/template-syntax#html-attribute-vs-dom-property) guide for more background on the difference between attributes and properties.
+   See the [Binding syntax](guide/binding-syntax#html-attribute-vs-dom-property) guide for more background on the difference between attributes and properties.
 
 </div>
 
@@ -61,10 +65,10 @@ For full details of these and other tools, see the [Angular CDK accessibility ov
 Native HTML elements capture a number of standard interaction patterns that are important to accessibility.
 When authoring Angular components, you should re-use these native elements directly when possible, rather than re-implementing well-supported behaviors.
 
-For example, instead of creating a custom element for a new variety of button, you can create a component that uses an attribute selector with a native `<button>` element.
+For example, instead of creating a custom element for a new variety of button, create a component that uses an attribute selector with a native `<button>` element.
 This most commonly applies to `<button>` and `<a>`, but can be used with many other types of element.
 
-You can see examples of this pattern in Angular Material: [`MatButton`](https://github.com/angular/components/blob/master/src/material/button/button.ts#L66-L68), [`MatTabNav`](https://github.com/angular/components/blob/master/src/material/tabs/tab-nav-bar/tab-nav-bar.ts#L67), [`MatTable`](https://github.com/angular/components/blob/master/src/material/table/table.ts#L17).
+You can see examples of this pattern in Angular Material: [`MatButton`](https://github.com/angular/components/blob/50d3f29b6dc717b512dbd0234ce76f4ab7e9762a/src/material/button/button.ts#L67-L69), [`MatTabNav`](https://github.com/angular/components/blob/50d3f29b6dc717b512dbd0234ce76f4ab7e9762a/src/material/tabs/tab-nav-bar/tab-nav-bar.ts#L139), [`MatTable`](https://github.com/angular/components/blob/50d3f29b6dc717b512dbd0234ce76f4ab7e9762a/src/material/table/table.ts#L22).
 
 ### Using containers for native elements
 
@@ -73,14 +77,14 @@ For example, the native `<input>` element cannot have children, so any custom te
 to wrap an `<input>` with additional elements.
 While you might just include the `<input>` in your custom component's template,
 this makes it impossible for users of the component to set arbitrary properties and attributes to the input element.
-Instead, you can create a container component that uses content projection to include the native control in the
+Instead, create a container component that uses content projection to include the native control in the
 component's API.
 
 You can see [`MatFormField`](https://material.angular.io/components/form-field/overview) as an example of this pattern.
 
 ## Case study: Building a custom progress bar
 
-The following example shows how to make a simple progress bar accessible by using host binding to control accessibility-related attributes.
+The following example shows how to make a progress bar accessible by using host binding to control accessibility-related attributes.
 
 * The component defines an accessibility-enabled element with both the standard HTML attribute `role`, and ARIA attributes. The ARIA attribute `aria-valuenow` is bound to the user's input.
 
@@ -91,8 +95,6 @@ The following example shows how to make a simple progress bar accessible by usin
 
    <code-example path="accessibility/src/app/app.component.html" header="src/app/app.component.html" region="template"></code-example>
 
-
-To see the progress bar in a working example app, refer to the <live-example></live-example>.
 
 ## Routing and focus management
 
@@ -139,15 +141,10 @@ You should avoid situations where focus returns to the `body` element after a ro
 
 * [Rob Dodson A11ycasts](https://www.youtube.com/watch?v=HtTyRajRuyY)
 
-* [Codelyzer](http://codelyzer.com/rules/) provides linting rules that can help you make sure your code meets accessibility standards.
+* [Angular ESLint](https://github.com/angular-eslint/angular-eslint#functionality) provides linting rules that can help you make sure your code meets accessibility standards.
 
 Books
 
 * "A Web for Everyone: Designing Accessible User Experiences", Sarah Horton and Whitney Quesenbery
 
 * "Inclusive Design Patterns", Heydon Pickering
-
-## More on accessibility
-
-You may also be interested in the following:
-* [Audit your Angular app's accessibility with codelyzer](https://web.dev/accessible-angular-with-codelyzer/).

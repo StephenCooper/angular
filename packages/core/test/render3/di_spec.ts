@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
@@ -9,38 +9,36 @@
 import {InjectFlags, Optional, Renderer2, Self} from '@angular/core';
 import {createLView, createTView, getOrCreateTNode} from '@angular/core/src/render3/instructions/shared';
 import {RenderFlags} from '@angular/core/src/render3/interfaces/definition';
+import {NodeInjectorOffset} from '@angular/core/src/render3/interfaces/injector';
 
 import {ɵɵdefineComponent} from '../../src/render3/definition';
-import {bloomAdd, bloomHasToken, bloomHashBitOrFactory as bloomHash, getOrCreateNodeInjectorForNode} from '../../src/render3/di';
+import {bloomAdd, bloomHashBitOrFactory as bloomHash, bloomHasToken, getOrCreateNodeInjectorForNode} from '../../src/render3/di';
 import {ɵɵdefineDirective, ɵɵdirectiveInject, ɵɵelement, ɵɵelementEnd, ɵɵelementStart, ɵɵtext} from '../../src/render3/index';
-import {TNODE} from '../../src/render3/interfaces/injector';
 import {TNodeType} from '../../src/render3/interfaces/node';
 import {isProceduralRenderer} from '../../src/render3/interfaces/renderer';
-import {LViewFlags, TVIEW} from '../../src/render3/interfaces/view';
-import {selectView} from '../../src/render3/state';
+import {LViewFlags, TVIEW, TViewType} from '../../src/render3/interfaces/view';
+import {enterView, leaveView} from '../../src/render3/state';
 
 import {getRendererFactory2} from './imported_renderer2';
 import {ComponentFixture, createComponent, createDirective} from './render_util';
 
 describe('di', () => {
   describe('directive injection', () => {
-
     class DirB {
       value = 'DirB';
 
-      static ngFactoryDef = () => new DirB();
-      static ngDirectiveDef =
+      static ɵfac = () => new DirB();
+      static ɵdir =
           ɵɵdefineDirective({selectors: [['', 'dirB', '']], type: DirB, inputs: {value: 'value'}});
     }
 
     describe('flags', () => {
-
       class DirB {
         // TODO(issue/24571): remove '!'.
-        value !: string;
+        value!: string;
 
-        static ngFactoryDef = () => new DirB();
-        static ngDirectiveDef =
+        static ɵfac = () => new DirB();
+        static ɵdir =
             ɵɵdefineDirective({type: DirB, selectors: [['', 'dirB', '']], inputs: {value: 'dirB'}});
       }
 
@@ -50,28 +48,29 @@ describe('di', () => {
         class DirA {
           constructor(@Optional() public dirB: DirB|null) {}
 
-          static ngFactoryDef =
+          static ɵfac =
               () => {
                 dirA = new DirA(ɵɵdirectiveInject(DirB, InjectFlags.Optional));
                 return dirA;
               }
 
-          static ngDirectiveDef = ɵɵdefineDirective({type: DirA, selectors: [['', 'dirA', '']]});
+          static ɵdir = ɵɵdefineDirective({type: DirA, selectors: [['', 'dirA', '']]});
         }
 
         beforeEach(() => dirA = null);
 
         it('should not throw if dependency is @Optional (limp mode)', () => {
-
           /** <div dirA></div> */
           const App = createComponent('app', function(rf: RenderFlags, ctx: any) {
             if (rf & RenderFlags.Create) {
-              ɵɵelement(0, 'div', ['dirA', '']);
+              ɵɵelement(0, 'div', 0);
             }
-          }, 1, 0, [DirA, DirB]);
+          }, 1, 0, [DirA, DirB], [], undefined, [], [], undefined, [['dirA', '']]);
 
-          expect(() => { new ComponentFixture(App); }).not.toThrow();
-          expect(dirA !.dirB).toEqual(null);
+          expect(() => {
+            new ComponentFixture(App);
+          }).not.toThrow();
+          expect(dirA!.dirB).toEqual(null);
         });
       });
 
@@ -81,8 +80,8 @@ describe('di', () => {
         class DirA {
           constructor(@Self() public dirB: DirB) {}
 
-          static ngFactoryDef = () => dirA = new DirA(ɵɵdirectiveInject(DirB, InjectFlags.Self));
-          static ngDirectiveDef = ɵɵdefineDirective({type: DirA, selectors: [['', 'dirA', '']]});
+          static ɵfac = () => dirA = new DirA(ɵɵdirectiveInject(DirB, InjectFlags.Self));
+          static ɵdir = ɵɵdefineDirective({type: DirA, selectors: [['', 'dirA', '']]});
         }
 
         const DirC = createDirective('dirC');
@@ -92,19 +91,25 @@ describe('di', () => {
          *   <div dirA dirC></div>
          * </div>
          */
-        const App = createComponent('app', function(rf: RenderFlags, ctx: any) {
-          if (rf & RenderFlags.Create) {
-            ɵɵelementStart(0, 'div', ['dirB', '']);
-            ɵɵelement(1, 'div', ['dirA', '', 'dirC', '']);
-            ɵɵelementEnd();
-          }
-        }, 2, 0, [DirA, DirB, DirC]);
+        const App = createComponent(
+            'app',
+            function(rf: RenderFlags, ctx: any) {
+              if (rf & RenderFlags.Create) {
+                ɵɵelementStart(0, 'div', 0);
+                ɵɵelement(1, 'div', 1);
+                ɵɵelementEnd();
+              }
+            },
+            2, 0, [DirA, DirB, DirC], [], undefined, [], [], undefined,
+            [['dirB', ''], ['dirA', '', 'dirC', '']]);
 
         expect(() => {
           (DirA as any)['__NG_ELEMENT_ID__'] = 1;
           (DirC as any)['__NG_ELEMENT_ID__'] = 257;
           new ComponentFixture(App);
-        }).toThrowError(/NodeInjector: NOT_FOUND \[DirB]/);
+        })
+            .toThrowError(
+                'NG0201: No provider for DirB found in NodeInjector. Find more at https://angular.io/errors/NG0201');
       });
     });
   });
@@ -113,17 +118,18 @@ describe('di', () => {
     class MyComp {
       constructor(public renderer: Renderer2) {}
 
-      static ngFactoryDef = () => new MyComp(ɵɵdirectiveInject(Renderer2 as any));
-      static ngComponentDef = ɵɵdefineComponent({
+      static ɵfac = () => new MyComp(ɵɵdirectiveInject(Renderer2 as any));
+      static ɵcmp = ɵɵdefineComponent({
         type: MyComp,
         selectors: [['my-comp']],
-        consts: 1,
+        decls: 1,
         vars: 0,
-        template: function(rf: RenderFlags, ctx: MyComp) {
-          if (rf & RenderFlags.Create) {
-            ɵɵtext(0, 'Foo');
-          }
-        }
+        template:
+            function(rf: RenderFlags, ctx: MyComp) {
+              if (rf & RenderFlags.Create) {
+                ɵɵtext(0, 'Foo');
+              }
+            }
       });
     }
 
@@ -133,18 +139,21 @@ describe('di', () => {
       expect(isProceduralRenderer(fixture.component.renderer)).toBeTruthy();
     });
 
-    it('should throw when injecting Renderer2 but the application is using Renderer3',
-       () => { expect(() => new ComponentFixture(MyComp)).toThrow(); });
+    it('should throw when injecting Renderer2 but the application is using Renderer3', () => {
+      expect(() => new ComponentFixture(MyComp)).toThrow();
+    });
   });
 
   describe('ɵɵinject', () => {
     describe('bloom filter', () => {
       let mockTView: any;
       beforeEach(() => {
-        mockTView = {data: [0, 0, 0, 0, 0, 0, 0, 0, null], firstTemplatePass: true};
+        mockTView = {data: [0, 0, 0, 0, 0, 0, 0, 0, null], firstCreatePass: true};
       });
 
-      function bloomState() { return mockTView.data.slice(0, TNODE).reverse(); }
+      function bloomState() {
+        return mockTView.data.slice(0, NodeInjectorOffset.TNODE).reverse();
+      }
 
       class Dir0 {
         /** @internal */ static __NG_ELEMENT_ID__ = 0;
@@ -173,6 +182,9 @@ describe('di', () => {
       class Dir231 {
         /** @internal */ static __NG_ELEMENT_ID__ = 231;
       }
+      class Dir260 {
+        /** @internal */ static __NG_ELEMENT_ID__ = 260;
+      }
 
       it('should add values', () => {
         bloomAdd(0, mockTView, Dir0);
@@ -191,6 +203,8 @@ describe('di', () => {
         expect(bloomState()).toEqual([0, 64, 32, 16, 8, 4, 2, 1]);
         bloomAdd(0, mockTView, Dir231);
         expect(bloomState()).toEqual([128, 64, 32, 16, 8, 4, 2, 1]);
+        bloomAdd(0, mockTView, Dir260);
+        expect(bloomState()).toEqual([128, 64, 32, 16, 8, 4, 2, 17 /* 1 + 2^(260-256) */]);
       });
 
       it('should query values', () => {
@@ -202,6 +216,7 @@ describe('di', () => {
         bloomAdd(0, mockTView, Dir165);
         bloomAdd(0, mockTView, Dir198);
         bloomAdd(0, mockTView, Dir231);
+        bloomAdd(0, mockTView, Dir260);
 
         expect(bloomHasToken(bloomHash(Dir0) as number, 0, mockTView.data)).toEqual(true);
         expect(bloomHasToken(bloomHash(Dir1) as number, 0, mockTView.data)).toEqual(false);
@@ -212,6 +227,7 @@ describe('di', () => {
         expect(bloomHasToken(bloomHash(Dir165) as number, 0, mockTView.data)).toEqual(true);
         expect(bloomHasToken(bloomHash(Dir198) as number, 0, mockTView.data)).toEqual(true);
         expect(bloomHasToken(bloomHash(Dir231) as number, 0, mockTView.data)).toEqual(true);
+        expect(bloomHasToken(bloomHash(Dir260) as number, 0, mockTView.data)).toEqual(true);
       });
     });
   });
@@ -219,23 +235,21 @@ describe('di', () => {
   describe('getOrCreateNodeInjector', () => {
     it('should handle initial undefined state', () => {
       const contentView = createLView(
-          null, createTView(-1, null, 1, 0, null, null, null, null), null, LViewFlags.CheckAlways,
-          null, null, {} as any, {} as any);
-      const oldView = selectView(contentView, null);
+          null, createTView(TViewType.Component, null, null, 1, 0, null, null, null, null, null),
+          {}, LViewFlags.CheckAlways, null, null, {} as any, {} as any, null, null, null);
+      enterView(contentView);
       try {
-        const parentTNode =
-            getOrCreateTNode(contentView[TVIEW], null, 0, TNodeType.Element, null, null);
+        const parentTNode = getOrCreateTNode(contentView[TVIEW], 0, TNodeType.Element, null, null);
         // Simulate the situation where the previous parent is not initialized.
         // This happens on first bootstrap because we don't init existing values
         // so that we have smaller HelloWorld.
-        (parentTNode as{parent: any}).parent = undefined;
+        (parentTNode as {parent: any}).parent = undefined;
 
         const injector = getOrCreateNodeInjectorForNode(parentTNode, contentView);
         expect(injector).not.toEqual(-1);
       } finally {
-        selectView(oldView, null);
+        leaveView();
       }
     });
   });
-
 });

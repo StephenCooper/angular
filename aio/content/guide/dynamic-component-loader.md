@@ -1,8 +1,6 @@
-# Dynamic Component Loader
+# Dynamic component loader
 
-Component templates are not always fixed. An application may need to load new components at runtime.
-
-This cookbook shows you how to use `ComponentFactoryResolver` to add components dynamically.
+Component templates are not always fixed. An application might need to load new components at runtime. This cookbook shows you how to add components dynamically.
 
 See the <live-example name="dynamic-component-loader"></live-example>
 of the code in this cookbook.
@@ -28,7 +26,7 @@ Angular comes with its own API for loading components dynamically.
 
 ## The anchor directive
 
-Before you can add components you have to define an anchor point
+Before adding components, you have to define an anchor point
 to tell Angular where to insert components.
 
 The ad banner uses a helper directive called `AdDirective` to
@@ -42,7 +40,7 @@ mark valid insertion points in the template.
 `AdDirective` injects `ViewContainerRef` to gain access to the view
 container of the element that will host the dynamically added component.
 
-In the `@Directive` decorator, notice the selector name, `ad-host`;
+In the `@Directive` decorator, notice the selector name, `adHost`;
 that's what you use to apply the directive to the element.
 The next section shows you how.
 
@@ -56,7 +54,7 @@ decorator's `template` property as a template string.
 
 The `<ng-template>` element is where you apply the directive you just made.
 To apply the `AdDirective`, recall the selector from `ad.directive.ts`,
-`ad-host`. Apply that to `<ng-template>` without the square brackets. Now Angular knows
+`[adHost]`. Apply that to `<ng-template>` without the square brackets. Now Angular knows
 where to dynamically load components.
 
 
@@ -113,10 +111,6 @@ value to select an `adItem` from the array.
 
 
 
-After `loadComponent()` selects an ad, it uses `ComponentFactoryResolver`
-to resolve a `ComponentFactory` for each specific component.
-The `ComponentFactory` then creates an instance of each component.
-
 Next, you're targeting the `viewContainerRef` that
 exists on this specific instance of the component. How do you know it's
 this specific instance? Because it's referring to `adHost` and `adHost` is the
@@ -129,22 +123,6 @@ To add the component to the template, you call `createComponent()` on `ViewConta
 
 The `createComponent()` method returns a reference to the loaded component.
 Use that reference to interact with the component by assigning to its properties or calling its methods.
-
-
-{@a selector-references}
-
-
-#### Selector references
-
-Generally, the Angular compiler generates a `ComponentFactory`
-for any component referenced in a template. However, there are
-no selector references in the templates for
-dynamically loaded components since they load at runtime.
-
-To ensure that the compiler still generates a factory,
-add dynamically loaded components to the `NgModule`'s `entryComponents` array:
-
-<code-example path="dynamic-component-loader/src/app/app.module.ts" region="entry-components" header="src/app/app.module.ts (entry components)"></code-example>
 
 
 
@@ -183,10 +161,10 @@ Here are two sample components and the `AdComponent` interface for reference:
 ## Final ad banner
  The final ad banner looks like this:
 
-<figure>
+<div class="lightbox">
   <img src="generated/images/guide/dynamic-component-loader/ads-example.gif" alt="Ads">
-</figure>
-
-
+</div>
 
 See the <live-example name="dynamic-component-loader"></live-example>.
+
+@reviewed 2021-09-17

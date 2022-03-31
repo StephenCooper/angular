@@ -1,51 +1,24 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {CommonModule, DOCUMENT, PlatformLocation, ɵPLATFORM_BROWSER_ID as PLATFORM_BROWSER_ID} from '@angular/common';
-import {APP_ID, ApplicationModule, ErrorHandler, Inject, ModuleWithProviders, NgModule, NgZone, Optional, PLATFORM_ID, PLATFORM_INITIALIZER, PlatformRef, RendererFactory2, Sanitizer, SkipSelf, StaticProvider, Testability, createPlatformFactory, platformCore, ɵConsole as Console, ɵINJECTOR_SCOPE as INJECTOR_SCOPE} from '@angular/core';
+import {CommonModule, DOCUMENT, XhrFactory, ɵPLATFORM_BROWSER_ID as PLATFORM_BROWSER_ID} from '@angular/common';
+import {APP_ID, ApplicationModule, createPlatformFactory, ErrorHandler, Inject, ModuleWithProviders, NgModule, NgZone, Optional, PLATFORM_ID, PLATFORM_INITIALIZER, platformCore, PlatformRef, RendererFactory2, Sanitizer, SkipSelf, StaticProvider, Testability, ɵINJECTOR_SCOPE as INJECTOR_SCOPE, ɵsetDocument} from '@angular/core';
+
 import {BrowserDomAdapter} from './browser/browser_adapter';
 import {SERVER_TRANSITION_PROVIDERS, TRANSITION_ID} from './browser/server-transition';
 import {BrowserGetTestability} from './browser/testability';
-import {ELEMENT_PROBE_PROVIDERS} from './dom/debug/ng_probe';
+import {BrowserXhr} from './browser/xhr';
 import {DomRendererFactory2} from './dom/dom_renderer';
 import {DomEventsPlugin} from './dom/events/dom_events';
 import {EVENT_MANAGER_PLUGINS, EventManager} from './dom/events/event_manager';
-import {HAMMER_PROVIDERS} from './dom/events/hammer_gestures';
 import {KeyEventsPlugin} from './dom/events/key_events';
 import {DomSharedStylesHost, SharedStylesHost} from './dom/shared_styles_host';
 import {DomSanitizer, DomSanitizerImpl} from './security/dom_sanitization_service';
-
-export const INTERNAL_BROWSER_PLATFORM_PROVIDERS: StaticProvider[] = [
-  {provide: PLATFORM_ID, useValue: PLATFORM_BROWSER_ID},
-  {provide: PLATFORM_INITIALIZER, useValue: initDomAdapter, multi: true},
-  {provide: DOCUMENT, useFactory: _document, deps: []},
-];
-
-const BROWSER_SANITIZATION_PROVIDERS__PRE_R3__: StaticProvider[] = [
-  {provide: Sanitizer, useExisting: DomSanitizer},
-  {provide: DomSanitizer, useClass: DomSanitizerImpl, deps: [DOCUMENT]},
-];
-
-export const BROWSER_SANITIZATION_PROVIDERS__POST_R3__ = [];
-
-/**
- * @security Replacing built-in sanitization providers exposes the application to XSS risks.
- * Attacker-controlled data introduced by an unsanitized provider could expose your
- * application to XSS risks. For more detail, see the [Security Guide](http://g.co/ng/security).
- * @publicApi
- */
-export const BROWSER_SANITIZATION_PROVIDERS = BROWSER_SANITIZATION_PROVIDERS__PRE_R3__;
-
-/**
- * @publicApi
- */
-export const platformBrowser: (extraProviders?: StaticProvider[]) => PlatformRef =
-    createPlatformFactory(platformCore, 'browser', INTERNAL_BROWSER_PLATFORM_PROVIDERS);
 
 export function initDomAdapter() {
   BrowserDomAdapter.makeCurrent();
@@ -57,11 +30,27 @@ export function errorHandler(): ErrorHandler {
 }
 
 export function _document(): any {
+  // Tell ivy about the global document
+  ɵsetDocument(document);
   return document;
 }
 
+export const INTERNAL_BROWSER_PLATFORM_PROVIDERS: StaticProvider[] = [
+  {provide: PLATFORM_ID, useValue: PLATFORM_BROWSER_ID},
+  {provide: PLATFORM_INITIALIZER, useValue: initDomAdapter, multi: true},
+  {provide: DOCUMENT, useFactory: _document, deps: []},
+];
+
+/**
+ * A factory function that returns a `PlatformRef` instance associated with browser service
+ * providers.
+ *
+ * @publicApi
+ */
+export const platformBrowser: (extraProviders?: StaticProvider[]) => PlatformRef =
+    createPlatformFactory(platformCore, 'browser', INTERNAL_BROWSER_PLATFORM_PROVIDERS);
+
 export const BROWSER_MODULE_PROVIDERS: StaticProvider[] = [
-  BROWSER_SANITIZATION_PROVIDERS,
   {provide: INJECTOR_SCOPE, useValue: 'root'},
   {provide: ErrorHandler, useFactory: errorHandler, deps: []},
   {
@@ -71,7 +60,6 @@ export const BROWSER_MODULE_PROVIDERS: StaticProvider[] = [
     deps: [DOCUMENT, NgZone, PLATFORM_ID]
   },
   {provide: EVENT_MANAGER_PLUGINS, useClass: KeyEventsPlugin, multi: true, deps: [DOCUMENT]},
-  HAMMER_PROVIDERS,
   {
     provide: DomRendererFactory2,
     useClass: DomRendererFactory2,
@@ -82,7 +70,7 @@ export const BROWSER_MODULE_PROVIDERS: StaticProvider[] = [
   {provide: DomSharedStylesHost, useClass: DomSharedStylesHost, deps: [DOCUMENT]},
   {provide: Testability, useClass: Testability, deps: [NgZone]},
   {provide: EventManager, useClass: EventManager, deps: [EVENT_MANAGER_PLUGINS, NgZone]},
-  ELEMENT_PROBE_PROVIDERS,
+  {provide: XhrFactory, useClass: BrowserXhr, deps: []},
 ];
 
 /**

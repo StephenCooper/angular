@@ -1,13 +1,12 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 
 import {ɵgetDOM as getDOM} from '@angular/common';
-import {beforeEach, describe, it} from '@angular/core/testing/src/testing_internal';
 import {DomSharedStylesHost} from '@angular/platform-browser/src/dom/shared_styles_host';
 import {expect} from '@angular/platform-browser/testing/src/matchers';
 
@@ -45,6 +44,15 @@ import {expect} from '@angular/platform-browser/testing/src/matchers';
     it('should use the document head as default host', () => {
       ssh.addStyles(['a {};', 'b {};']);
       expect(doc.head).toHaveText('a {};b {};');
+    });
+
+    it('should remove style nodes when the host is removed', () => {
+      ssh.addStyles(['a {};']);
+      ssh.addHost(someHost);
+      expect(someHost.innerHTML).toEqual('<style>a {};</style>');
+
+      ssh.removeHost(someHost);
+      expect(someHost.innerHTML).toEqual('');
     });
 
     it('should remove style nodes on destroy', () => {

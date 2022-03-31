@@ -1,14 +1,14 @@
-# The Ahead-of-Time (AOT) compiler
+# Ahead-of-time (AOT) compilation
 
 An Angular application consists mainly of components and their HTML templates. Because the components and templates provided by Angular cannot be understood by the browser directly, Angular applications require a compilation process before they can run in a browser.
 
-The Angular Ahead-of-Time (AOT) compiler converts your Angular HTML and TypeScript code into efficient JavaScript code during the build phase _before_ the browser downloads and runs that code. Compiling your application during the build process provides a faster rendering in the browser.
+The Angular [ahead-of-time (AOT) compiler](guide/glossary#aot) converts your Angular HTML and TypeScript code into efficient JavaScript code during the build phase _before_ the browser downloads and runs that code. Compiling your application during the build process provides a faster rendering in the browser.
 
 This guide explains how to specify metadata and apply available compiler options to compile your applications efficiently using the AOT compiler.
 
-<div class="alert is-helpful"
+<div class="alert is-helpful">
 
-  <a href="https://www.youtube.com/watch?v=kW9cJsvcsGo">Watch compiler author Tobias Bosch explain the Angular compiler</a> at AngularConnect 2016.
+  <a href="https://www.youtube.com/watch?v=anphffaCZrQ">Watch Alex Rickabaugh explain the Angular compiler</a> at AngularConnect 2019.
 
 </div>
 
@@ -18,14 +18,14 @@ Here are some reasons you might want to use AOT.
 
 * *Faster rendering*
    With AOT, the browser downloads a pre-compiled version of the application.
-   The browser loads executable code so it can render the application immediately, without waiting to compile the app first.
+   The browser loads executable code so it can render the application immediately, without waiting to compile the application first.
 
 * *Fewer asynchronous requests*
    The compiler _inlines_ external HTML templates and CSS style sheets within the application JavaScript,
    eliminating separate ajax requests for those source files.
 
 * *Smaller Angular framework download size*
-   There's no need to download the Angular compiler if the app is already compiled.
+   There's no need to download the Angular compiler if the application is already compiled.
    The compiler is roughly half of Angular itself, so omitting it dramatically reduces the application payload.
 
 * *Detect template errors earlier*
@@ -43,32 +43,12 @@ Here are some reasons you might want to use AOT.
 
 Angular offers two ways to compile your application:
 
-* **_Just-in-Time_ (JIT)**, which compiles your app in the browser at runtime.
-* **_Ahead-of-Time_ (AOT)**, which compiles your app at build time.
+* **_Just-in-Time_ (JIT)**, which compiles your application in the browser at runtime. This was the default until Angular 8.
+* **_Ahead-of-Time_ (AOT)**, which compiles your application and libraries at build time. This is the default since Angular 9.
 
-JIT compilation is the default when you run the [`ng build`](cli/build) (build only) or [`ng serve`](cli/serve)  (build and serve locally) CLI commands:
-
-<code-example language="sh" class="code-shell">
-  ng build
-  ng serve
-</code-example>
-
-{@a compile}
-
-For AOT compilation, include the `--aot` option with the `ng build` or `ng serve` command:
-
-<code-example language="sh" class="code-shell">
-  ng build --aot
-  ng serve --aot
-</code-example>
-
-<div class="alert is-helpful">
-
-The `ng build` command with the `--prod` meta-flag (`ng build --prod`) compiles with AOT by default.
+When you run the [`ng build`](cli/build) (build only) or [`ng serve`](cli/serve) (build and serve locally) CLI commands, the type of compilation (JIT or AOT) depends on the value of the `aot` property in your build configuration specified in `angular.json`. By default, `aot` is set to `true` for new CLI applications.
 
 See the [CLI command reference](cli) and [Building and serving Angular apps](guide/build) for more information.
-
-</div>
 
 ## How AOT works
 
@@ -82,7 +62,7 @@ In the following example, the `@Component()` metadata object and the class const
 @Component({
   selector: 'app-typical',
   template: '<div>A typical component for {{data.name}}</div>'
-)}
+})
 export class TypicalComponent {
   @Input() data: TypicalData;
   constructor(private someService: SomeService) { ... }
@@ -125,7 +105,7 @@ For help in understanding and resolving these problems, see [AOT Metadata Errors
 
 ### Configuring AOT compilation
 
-You can provide options in the `tsconfig.json` [TypeScript configuration file](guide/typescript-configuration) that control the compilation process. See [Angular compiler options](guide/angular-compiler-options) for a complete list of available options.
+You can provide options in the [TypeScript configuration file](guide/typescript-configuration) that controls the compilation process. See [Angular compiler options](guide/angular-compiler-options) for a complete list of available options.
 
 ## Phase 1: Code analysis
 
@@ -144,7 +124,7 @@ describes the JSON format as a collection of TypeScript interfaces.
 {@a expression-syntax}
 ### Expression syntax limitations
 
-The  AOT collector only understands a subset of JavaScript.
+The AOT collector only understands a subset of JavaScript.
 Define metadata objects with the following limited syntax:
 
 <style>
@@ -193,7 +173,7 @@ Define metadata objects with the following limited syntax:
     <td><code>`pie is ${multiplier} times better than cake`</code></td>
    <tr>
     <td>Literal string</td>
-    <td><code>pi</code></td>
+    <td><code>'pi'</code></td>
   </tr>
    <tr>
     <td>Literal number</td>
@@ -231,7 +211,7 @@ The compiler later reports the error if it needs that piece of metadata to gener
 
 <div class="alert is-helpful">
 
- If you want `ngc` to report syntax errors immediately rather than produce a `.metadata.json` file with errors, set the `strictMetadataEmit` option in the TypeScript configuration file, `tsconfig.json`.
+ If you want `ngc` to report syntax errors immediately rather than produce a `.metadata.json` file with errors, set the `strictMetadataEmit` option in the TypeScript configuration file.
 
 ```
   "angularCompilerOptions": {
@@ -562,10 +542,13 @@ It does not, however, rewrite the `.d.ts` file, so TypeScript doesn't recognize 
 
 
 {@a binding-expression-validation}
+
 ## Phase 3: Template type checking
 
+One of the Angular compiler's most helpful features is the ability to type-check expressions within templates, and catch any errors before they cause crashes at runtime.
 In the template type-checking phase, the Angular template compiler uses the TypeScript compiler to validate the binding expressions in templates.
-Enable this phase explicitly by adding the compiler option `"fullTemplateTypeCheck"` in the `"angularCompilerOptions"` of the project's `tsconfig.json`
+
+Enable this phase explicitly by adding the compiler option `"fullTemplateTypeCheck"` in the `"angularCompilerOptions"` of the project's TypeScript configuration file
 (see [Angular Compiler Options](guide/angular-compiler-options)).
 
 Template validation produces error messages when a type error is detected in a template binding
@@ -614,7 +597,7 @@ For example, to avoid `Object is possibly 'undefined'` error in the template abo
 ```typescript
   @Component({
     selector: 'my-component',
-    template: '<span *ngIf="person"> {{person.addresss.street}} </span>'
+    template: '<span *ngIf="person"> {{person.address.street}} </span>'
   })
   class MyComponent {
     person?: Person;
@@ -623,20 +606,11 @@ For example, to avoid `Object is possibly 'undefined'` error in the template abo
 
 Using `*ngIf` allows the TypeScript compiler to infer that the `person` used in the binding expression will never be `undefined`.
 
-#### Custom `ngIf` like directives
-
-Directives that behave like `*ngIf` can declare that they want the same treatment by including a static member marker that is a signal to the template compiler to treat them like `*ngIf`. This static member for `*ngIf` is:
-
-```typescript
-    public static ngIfUseIfTypeGuard: void;
-```
-
-This declares that the input property `ngIf` of the `NgIf` directive should be treated as a guard to the use of its template, implying that the template will only be instantiated if the `ngIf` input property is true.
-
+For more information about input type narrowing, see [Improving template type checking for custom directives](guide/structural-directives#directive-type-checks).
 
 ### Non-null type assertion operator
 
-Use the [non-null type assertion operator](guide/template-syntax#non-null-assertion-operator) to suppress the `Object is possibly 'undefined'` error when it is inconvenient to use `*ngIf` or when some constraint in the component ensures that the expression is always non-null when the binding expression is interpolated.
+Use the [non-null type assertion operator](guide/template-expression-operators#non-null-assertion-operator) to suppress the `Object is possibly 'undefined'` error when it is inconvenient to use `*ngIf` or when some constraint in the component ensures that the expression is always non-null when the binding expression is interpolated.
 
 In the following example, the `person` and `address` properties are always set together, implying that `address` is always non-null if `person` is non-null.
 There is no convenient way to describe this constraint to TypeScript and the template compiler, but the error is suppressed in the example by using `address!.street`.
@@ -659,7 +633,7 @@ There is no convenient way to describe this constraint to TypeScript and the tem
 
 The non-null assertion operator should be used sparingly as refactoring of the component might break this constraint.
 
-In this example it is recommended to include the checking of `address` in the `*ngIf`as shown below:
+In this example it is recommended to include the checking of `address` in the `*ngIf` as shown below:
 
 ```typescript
   @Component({
@@ -674,22 +648,5 @@ In this example it is recommended to include the checking of `address` in the `*
       this.person = person;
       this.address = address;
     }
-  }
-```
-
-### Disabling type checking using `$any()`
-
-Disable checking of a binding expression by surrounding the expression in a call to the [`$any()` cast pseudo-function](guide/template-syntax).
-The compiler treats it as a cast to the `any` type just like in TypeScript when a `<any>` or `as any` cast is used.
-
-In the following example, the error `Property addresss does not exist` is suppressed by casting `person` to the `any` type.
-
-```typescript
-  @Component({
-    selector: 'my-component',
-    template: '{{$any(person).addresss.street}}'
-  })
-  class MyComponent {
-    person?: Person;
   }
 ```

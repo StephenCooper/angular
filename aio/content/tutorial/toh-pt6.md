@@ -1,4 +1,4 @@
-# HTTP
+# Get data from a server
 
 In this tutorial, you'll add the following data persistence features with help from
 Angular's `HttpClient`.
@@ -7,18 +7,22 @@ Angular's `HttpClient`.
 * Users can add, edit, and delete heroes and save these changes over HTTP.
 * Users can search for heroes by name.
 
-When you're done with this page, the app should look like this <live-example></live-example>.
+<div class="alert is-helpful">
+
+  For the sample application that this page describes, see the <live-example></live-example>.
+
+</div>
 
 ## Enable HTTP services
 
 `HttpClient` is Angular's mechanism for communicating with a remote server over HTTP.
 
-Make `HttpClient` available everywhere in the app in two steps. First, add it to the root `AppModule` by importing it:
+Make `HttpClient` available everywhere in the application in two steps. First, add it to the root `AppModule` by importing it:
 
 <code-example path="toh-pt6/src/app/app.module.ts" region="import-http-client" header="src/app/app.module.ts (HttpClientModule import)">
 </code-example>
 
-Next, still in the `AppModule`, add `HttpClient` to the `imports` array:
+Next, still in the `AppModule`, add `HttpClientModule` to the `imports` array:
 
 <code-example path="toh-pt6/src/app/app.module.ts" region="import-httpclientmodule" header="src/app/app.module.ts (imports array excerpt)">
 </code-example>
@@ -27,9 +31,9 @@ Next, still in the `AppModule`, add `HttpClient` to the `imports` array:
 ## Simulate a data server
 
 This tutorial sample mimics communication with a remote data server by using the
-[In-memory Web API](https://github.com/angular/in-memory-web-api "In-memory Web API") module.
+[In-memory Web API](https://github.com/angular/angular/tree/master/packages/misc/angular-in-memory-web-api "In-memory Web API") module.
 
-After installing the module, the app will make requests to and receive responses from the `HttpClient`
+After installing the module, the application will make requests to and receive responses from the `HttpClient`
 without knowing that the *In-memory Web API* is intercepting those requests,
 applying them to an in-memory data store, and returning simulated responses.
 
@@ -39,14 +43,14 @@ By using the In-memory Web API, you won't have to set up a server to learn about
 
 **Important:** the In-memory Web API module has nothing to do with HTTP in Angular.
 
-If you're just reading this tutorial to learn about `HttpClient`, you can [skip over](#import-heroes) this step.
+If you're reading this tutorial to learn about `HttpClient`, you can [skip over](#import-heroes) this step.
 If you're coding along with this tutorial, stay here and add the In-memory Web API now.
 
 </div>
 
 Install the In-memory Web API package from npm with the following command:
 
-<code-example language="sh" class="code-shell">
+<code-example language="sh">
   npm install angular-in-memory-web-api --save
 </code-example>
 
@@ -67,7 +71,7 @@ that primes the in-memory database.
 
 Generate the class `src/app/in-memory-data.service.ts` with the following command:
 
-<code-example language="sh" class="code-shell">
+<code-example language="sh">
   ng generate service InMemoryData
 </code-example>
 
@@ -75,9 +79,10 @@ Replace the default contents of `in-memory-data.service.ts` with the following:
 
 <code-example path="toh-pt6/src/app/in-memory-data.service.ts" region="init" header="src/app/in-memory-data.service.ts"></code-example>
 
-The `in-memory-data.service.ts` file replaces `mock-heroes.ts`, which is now safe to delete.
+The `in-memory-data.service.ts` file will take over the function of `mock-heroes.ts`.
+However, don't delete `mock-heroes.ts` yet, as you still need it for a few more steps of this tutorial.
 
-When the server is ready, you'll detach the In-memory Web API, and the app's requests will go through to the server.
+When the server is ready, you'll detach the In-memory Web API, and the application's requests will go through to the server.
 
 
 {@a import-heroes}
@@ -122,7 +127,7 @@ Convert that method to use `HttpClient` as follows:
 Refresh the browser. The hero data should successfully load from the
 mock server.
 
-You've swapped `of()` for `http.get()` and the app keeps working without any other changes
+You've swapped `of()` for `http.get()` and the application keeps working without any other changes
 because both functions return an `Observable<Hero[]>`.
 
 ### `HttpClient` methods return one value
@@ -140,7 +145,7 @@ This particular `HttpClient.get()` call returns an `Observable<Hero[]>`; that is
 ### `HttpClient.get()` returns response data
 
 `HttpClient.get()` returns the body of the response as an untyped JSON object by default.
-Applying the optional type specifier, `<Hero[]>` , gives you a typed result object.
+Applying the optional type specifier, `<Hero[]>` , adds TypeScript capabilities, which reduce errors during compile time.
 
 The server's data API determines the shape of the JSON data.
 The _Tour of Heroes_ data API returns the hero data as an array.
@@ -175,7 +180,7 @@ give it a `catchError()` operator.
 </code-example>
 
 The `catchError()` operator intercepts an **`Observable` that failed**.
-It passes the error an error handler that can do what it wants with the error.
+The operator then passes the error to the error handling function.
 
 The following `handleError()` method reports the error and then returns an
 innocuous result so that the application keeps working.
@@ -192,15 +197,15 @@ has configured with both the name of the operation that failed and a safe return
 </code-example>
 
 After reporting the error to the console, the handler constructs
-a user friendly message and returns a safe value to the app so the app can keep working.
+a user friendly message and returns a safe value to the application so the application can keep working.
 
 Because each service method returns a different kind of `Observable` result,
-`handleError()` takes a type parameter so it can return the safe value as the type that the app expects.
+`handleError()` takes a type parameter so it can return the safe value as the type that the application expects.
 
 ### Tap into the Observable
 
 The `HeroService` methods will **tap** into the flow of observable values
-and send a message, via the `log()` method, to the message area at the bottom of the page.
+and send a message, using the `log()` method, to the message area at the bottom of the page.
 
 They'll do that with the RxJS `tap()` operator,
 which looks at the observable values, does something with those values,
@@ -272,16 +277,16 @@ That header is in the `httpOptions` constant defined in the `HeroService`. Add t
 </code-example>
 
 Refresh the browser, change a hero name and save your change. The `save()`
-method in `HeroDetailComponent`navigates to the previous view.
+method in `HeroDetailComponent` navigates to the previous view.
 The hero now appears in the list with the changed name.
 
 
 ## Add a new hero
 
-To add a hero, this app only needs the hero's name. You can use an `<input>`
+To add a hero, this application only needs the hero's name. You can use an `<input>`
 element paired with an add button.
 
-Insert the following into the `HeroesComponent` template, just after
+Insert the following into the `HeroesComponent` template, after
 the heading:
 
 <code-example path="toh-pt6/src/app/heroes/heroes.component.html" region="add" header="src/app/heroes/heroes.component.html (add)"></code-example>
@@ -324,7 +329,7 @@ The HTML for the list of heroes should look like this:
 <code-example path="toh-pt6/src/app/heroes/heroes.component.html" region="list" header="src/app/heroes/heroes.component.html (list of heroes)"></code-example>
 
 To position the delete button at the far right of the hero entry,
-add some CSS to the `heroes.component.css`.  You'll find that CSS
+add some CSS to the `heroes.component.css`. You'll find that CSS
 in the [final review code](#heroescomponent) below.
 
 Add the `delete()` handler to the component class.
@@ -401,7 +406,7 @@ For this to work, the next step is to add a component with a selector that match
 
 Create a `HeroSearchComponent` with the CLI.
 
-<code-example language="sh" class="code-shell">
+<code-example language="sh">
   ng generate component hero-search
 </code-example>
 
@@ -491,7 +496,7 @@ It cancels and discards previous search observables, returning only the latest s
 
 <div class="alert is-helpful">
 
-  With the [switchMap operator](http://www.learnrxjs.io/operators/transformation/switchmap.html),
+  With the [switchMap operator](https://www.learnrxjs.io/learn-rxjs/operators/transformation/switchmap),
   every qualifying key event can trigger an `HttpClient.get()` method call.
   Even with a 300ms pause between requests, you could have multiple HTTP requests in flight
   and they may not return in the order sent.
@@ -501,7 +506,7 @@ It cancels and discards previous search observables, returning only the latest s
 
   Note that canceling a previous `searchHeroes()` Observable
   doesn't actually abort a pending HTTP request.
-  Unwanted results are simply discarded before they reach your application code.
+  Unwanted results are discarded before they reach your application code.
 
 </div>
 
@@ -510,16 +515,14 @@ That's the job of the [`AsyncPipe`](#asyncpipe) in the template.
 
 #### Try it
 
-Run the app again. In the *Dashboard*, enter some text in the search box.
+Run the application again. In the *Dashboard*, enter some text in the search box.
 If you enter characters that match any existing hero names, you'll see something like this.
 
-<figure>
-  <img src='generated/images/guide/toh/toh-hero-search.png' alt="Hero Search Component">
-</figure>
+<div class="lightbox">
+  <img src='generated/images/guide/toh/toh-hero-search.gif' alt="Hero Search field with the letters 'm' and 'a' along with four search results that match the query displayed in a list beneath the search input">
+</div>
 
 ## Final code review
-
-Your app should look like this <live-example></live-example>.
 
 Here are the code files discussed on this page (all in the `src/app/` folder).
 

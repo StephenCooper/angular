@@ -1,15 +1,15 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import {AnimationBuilder, animate, style} from '@angular/animations';
+import {animate, AnimationBuilder, style} from '@angular/animations';
 import {AnimationDriver} from '@angular/animations/browser';
 import {MockAnimationDriver} from '@angular/animations/browser/testing';
 import {Component, ViewChild} from '@angular/core';
-import {TestBed, fakeAsync, flushMicrotasks} from '@angular/core/testing';
+import {fakeAsync, flushMicrotasks, TestBed} from '@angular/core/testing';
 import {NoopAnimationsModule, ɵBrowserAnimationBuilder as BrowserAnimationBuilder} from '@angular/platform-browser/animations';
 
 import {el} from '../../testing/src/browser_util';
@@ -51,7 +51,7 @@ import {el} from '../../testing/src/browser_util';
            template: '...',
          })
          class Cmp {
-           @ViewChild('target', {static: false}) public target: any;
+           @ViewChild('target') public target: any;
 
            constructor(public builder: AnimationBuilder) {}
 
@@ -103,6 +103,44 @@ import {el} from '../../testing/src/browser_util';
          expect(started).toBeTruthy();
          expect(finished).toBeTruthy();
          expect(destroyed).toBeTruthy();
+       }));
+
+    it('should update `hasStarted()` on `play()` and `reset()`', fakeAsync(() => {
+         @Component({
+           selector: 'ani-another-cmp',
+           template: '...',
+         })
+         class CmpAnother {
+           @ViewChild('target') public target: any;
+
+           constructor(public builder: AnimationBuilder) {}
+
+           build() {
+             const definition =
+                 this.builder.build([style({opacity: 0}), animate(1000, style({opacity: 1}))]);
+
+             return definition.create(this.target);
+           }
+         }
+
+         TestBed.configureTestingModule({declarations: [CmpAnother]});
+
+         const fixture = TestBed.createComponent(CmpAnother);
+         const cmp = fixture.componentInstance;
+         fixture.detectChanges();
+
+         const player = cmp.build();
+
+         expect(player.hasStarted()).toBeFalsy();
+         flushMicrotasks();
+
+         player.play();
+         flushMicrotasks();
+         expect(player.hasStarted()).toBeTruthy();
+
+         player.reset();
+         flushMicrotasks();
+         expect(player.hasStarted()).toBeFalsy();
        }));
   });
 }

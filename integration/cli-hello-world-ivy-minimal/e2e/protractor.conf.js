@@ -1,18 +1,23 @@
+// @ts-check
 // Protractor configuration file, see link for more information
 // https://github.com/angular/protractor/blob/master/lib/config.ts
-
 const { SpecReporter } = require('jasmine-spec-reporter');
 
+/**
+ * @type { import("protractor").Config }
+ */
 exports.config = {
   allScriptsTimeout: 11000,
   specs: [
     './src/**/*.e2e-spec.ts'
   ],
+  chromeDriver: process.env.CHROMEDRIVER_BIN,
   capabilities: {
     browserName: 'chrome',
     chromeOptions: {
       binary: process.env.CHROME_BIN,
-      args: ['--no-sandbox']
+      // See /integration/README.md#browser-tests for more info on these args
+      args: ['--no-sandbox', '--headless', '--disable-gpu', '--disable-dev-shm-usage', '--hide-scrollbars', '--mute-audio']
     }
   },
   directConnect: true,
@@ -25,7 +30,7 @@ exports.config = {
   },
   onPrepare() {
     require('ts-node').register({
-      project: require('path').join(__dirname, './tsconfig.e2e.json')
+      project: require('path').join(__dirname, './tsconfig.json')
     });
     jasmine.getEnv().addReporter(new SpecReporter({ spec: { displayStacktrace: true } }));
   }

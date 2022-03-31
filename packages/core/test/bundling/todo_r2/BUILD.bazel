@@ -1,15 +1,11 @@
-package(default_visibility = ["//visibility:public"])
-
-load("//tools:defaults.bzl", "jasmine_node_test", "ng_module", "ng_rollup_bundle", "ts_library")
+load("//tools:defaults.bzl", "app_bundle", "jasmine_node_test", "ng_module", "ts_devserver", "ts_library")
 load("@npm//http-server:index.bzl", "http_server")
-load("@npm_bazel_typescript//:index.bzl", "ts_devserver")
+
+package(default_visibility = ["//visibility:public"])
 
 ng_module(
     name = "todo",
     srcs = ["index.ts"],
-    tags = [
-        "ivy-only",
-    ],
     deps = [
         "//packages/common",
         "//packages/core",
@@ -19,12 +15,9 @@ ng_module(
     ],
 )
 
-ng_rollup_bundle(
+app_bundle(
     name = "bundle",
     entry_point = "index.ts",
-    tags = [
-        "ivy-only",
-    ],
     deps = [
         ":todo",
         "//packages/common",
@@ -40,9 +33,6 @@ ts_library(
     name = "test_lib",
     testonly = True,
     srcs = glob(["*_spec.ts"]),
-    tags = [
-        "ivy-only",
-    ],
     deps = [
         "//packages:types",
         "//packages/compiler",
@@ -58,12 +48,9 @@ jasmine_node_test(
     name = "test",
     data = [
         ":bundle",
+        ":bundle.debug.min.js",
         ":bundle.js",
         ":bundle.min.js",
-        ":bundle.min_debug.js",
-    ],
-    tags = [
-        "ivy-only",
     ],
     deps = [":test_lib"],
 )
@@ -77,9 +64,6 @@ genrule(
         "tslib.js",
     ],
     cmd = "cp $< $@",
-    tags = [
-        "ivy-only",
-    ],
 )
 
 ts_devserver(
@@ -97,9 +81,6 @@ ts_devserver(
         "todo.css",
         "base.css",
     ],
-    tags = [
-        "ivy-only",
-    ],
     deps = [":todo"],
 )
 
@@ -109,10 +90,7 @@ http_server(
         "base.css",
         "index.html",
         "todo.css",
+        ":bundle.debug.min.js",
         ":bundle.min.js.br",
-        ":bundle.min_debug.js",
-    ],
-    tags = [
-        "ivy-only",
     ],
 )

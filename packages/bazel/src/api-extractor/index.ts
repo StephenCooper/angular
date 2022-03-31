@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
@@ -9,7 +9,9 @@
 /// <reference types="node"/>
 /// <reference lib="es2017"/>
 
-import {format, parseTsconfig} from '@bazel/typescript';
+// `tsc-wrapped` helpers are not exposed in the primary `@bazel/concatjs` entry-point.
+// TODO: Update when https://github.com/bazelbuild/rules_nodejs/pull/3286 is available.
+import {format, parseTsconfig} from '@bazel/concatjs/internal/tsc_wrapped';
 import {Extractor, ExtractorConfig, IConfigFile, IExtractorConfigPrepareOptions, IExtractorInvokeOptions} from '@microsoft/api-extractor';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -17,7 +19,7 @@ import * as path from 'path';
 const DEBUG = false;
 
 export function runMain(
-    tsConfig: string, entryPoint: string, dtsBundleOut?: string, apiReviewFolder?: string,
+    tsConfig: string, entryPointExecPath: string, dtsBundleOut: string, apiReviewFolder?: string,
     acceptApiUpdates = false): 1|0 {
   const [parsedConfig, errors] = parseTsconfig(tsConfig);
   if (errors && errors.length) {
@@ -26,7 +28,7 @@ export function runMain(
     return 1;
   }
 
-  const pkgJson = path.resolve(path.dirname(entryPoint), 'package.json');
+  const pkgJson = path.resolve(path.dirname(entryPointExecPath), 'package.json');
   if (!fs.existsSync(pkgJson)) {
     fs.writeFileSync(pkgJson, JSON.stringify({
       'name': 'GENERATED-BY-BAZEL',
@@ -38,7 +40,7 @@ export function runMain(
   // API extractor doesn't always support the version of TypeScript used in the repo
   // example: at the moment it is not compatable with 3.2
   // to use the internal TypeScript we shall not create a program but rather pass a parsed tsConfig.
-  const parsedTsConfig = parsedConfig !.config as any;
+  const parsedTsConfig = parsedConfig!.config as any;
   const compilerOptions = parsedTsConfig.compilerOptions;
   for (const [key, values] of Object.entries<string[]>(compilerOptions.paths)) {
     if (key === '*') {
@@ -64,7 +66,7 @@ export function runMain(
       overrideTsconfig: parsedTsConfig,
     },
     projectFolder: path.resolve(path.dirname(tsConfig)),
-    mainEntryPointFilePath: path.resolve(entryPoint),
+    mainEntryPointFilePath: path.resolve(entryPointExecPath),
     apiReport: {
       enabled: !!apiReviewFolder,
       // TODO(alan-agius4): remove this folder name when the below issue is solved upstream
@@ -75,8 +77,8 @@ export function runMain(
       enabled: false,
     },
     dtsRollup: {
-      enabled: !!dtsBundleOut,
-      untrimmedFilePath: dtsBundleOut && path.resolve(dtsBundleOut),
+      enabled: true,
+      untrimmedFilePath: path.resolve(dtsBundleOut),
     },
     tsdocMetadata: {
       enabled: false,
@@ -108,20 +110,6 @@ api-extractor: running with
   `);
   }
 
-  const [tsConfig, entryPoint, dtsBundleOut] = process.argv.slice(2);
-  const entryPoints = entryPoint.split(',');
-  const dtsBundleOuts = dtsBundleOut.split(',');
-
-  if (entryPoints.length !== entryPoints.length) {
-    throw new Error(
-        `Entry points count (${entryPoints.length}) does not match Bundle out count (${dtsBundleOuts.length})`);
-  }
-
-  for (let i = 0; i < entryPoints.length; i++) {
-    process.exitCode = runMain(tsConfig, entryPoints[i], dtsBundleOuts[i]);
-
-    if (process.exitCode !== 0) {
-      break;
-    }
-  }
+  const [tsConfig, entryPointExecPath, outputExecPath] = process.argv.slice(2);
+  process.exitCode = runMain(tsConfig, entryPointExecPath, outputExecPath);
 }

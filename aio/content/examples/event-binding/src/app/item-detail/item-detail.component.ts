@@ -1,4 +1,3 @@
-/* tslint:disable use-input-property-decorator use-output-property-decorator */
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 
 import { Item } from '../item';
@@ -10,7 +9,7 @@ import { Item } from '../item';
 })
 export class ItemDetailComponent {
 
-  @Input() item;
+  @Input() item!: Item;
   itemImageUrl = 'assets/teapot.svg';
   lineThrough = '';
   displayNone = '';

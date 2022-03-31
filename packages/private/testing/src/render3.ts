@@ -1,43 +1,43 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
+import {ɵresetJitOptions as resetJitOptions} from '@angular/core';
 
 /**
-* Wraps a function in a new function which sets up document and HTML for running a test.
-*
-* This function is intended to wrap an existing testing function. The wrapper
-* adds HTML to the `body` element of the `document` and subsequently tears it down.
-*
-* This function is intended to be used with `async await` and `Promise`s. If the wrapped
-* function returns a promise (or is `async`) then the teardown is delayed until that `Promise`
-* is resolved.
-*
-* On `node` this function detects if `document` is present and if not it will create one by
-* loading `domino` and installing it.
-*
-* Example:
-*
-* ```
-* describe('something', () => {
-*   it('should do something', withBody('<my-app></my-app>', async () => {
-*     const myApp = renderComponent(MyApp);
-*     await whenRendered(myApp);
-*     expect(getRenderedText(myApp)).toEqual('Hello World!');
-*   }));
-* });
-* ```
-*
-* @param html HTML which should be inserted into `body` of the `document`.
-* @param blockFn function to wrap. The function can return promise or be `async`.
-* @publicApi
-*/
+ * Wraps a function in a new function which sets up document and HTML for running a test.
+ *
+ * This function is intended to wrap an existing testing function. The wrapper
+ * adds HTML to the `body` element of the `document` and subsequently tears it down.
+ *
+ * This function is intended to be used with `async await` and `Promise`s. If the wrapped
+ * function returns a promise (or is `async`) then the teardown is delayed until that `Promise`
+ * is resolved.
+ *
+ * On `node` this function detects if `document` is present and if not it will create one by
+ * loading `domino` and installing it.
+ *
+ * Example:
+ *
+ * ```
+ * describe('something', () => {
+ *   it('should do something', withBody('<app-root></app-root>', async () => {
+ *     const myApp = renderComponent(MyApp);
+ *     await whenRendered(myApp);
+ *     expect(getRenderedText(myApp)).toEqual('Hello World!');
+ *   }));
+ * });
+ * ```
+ *
+ * @param html HTML which should be inserted into `body` of the `document`.
+ * @param blockFn function to wrap. The function can return promise or be `async`.
+ * @publicApi
+ */
 export function withBody<T extends Function>(html: string, blockFn: T): T {
   return function(done: DoneFn) {
-    ensureDocument();
     if (typeof blockFn === 'function') {
       document.body.innerHTML = html;
       const blockReturn = blockFn();
@@ -48,6 +48,28 @@ export function withBody<T extends Function>(html: string, blockFn: T): T {
       }
     }
   } as any;
+}
+
+/**
+ * Runs jasmine expectations against the provided keys for `ngDevMode`.
+ *
+ * Will not perform expectations for keys that are not provided.
+ *
+ * ```ts
+ * // Expect that `ngDevMode.styleMap` is `1`, and `ngDevMode.tNode` is `3`, but we don't care
+ * // about the other values.
+ * expectPerfCounters({
+ *   stylingMap: 1,
+ *   tNode: 3,
+ * })
+ * ```
+ */
+export function expectPerfCounters(expectedCounters: Partial<NgDevModePerfCounters>): void {
+  Object.keys(expectedCounters).forEach(key => {
+    const expected = (expectedCounters as any)[key];
+    const actual = (ngDevMode as any)[key];
+    expect(actual).toBe(expected, `ngDevMode.${key}`);
+  });
 }
 
 let savedDocument: Document|undefined = undefined;
@@ -120,4 +142,6 @@ export function cleanupDocument(): void {
 }
 
 if (typeof beforeEach == 'function') beforeEach(ensureDocument);
-if (typeof afterEach == 'function') beforeEach(cleanupDocument);
+if (typeof afterEach == 'function') afterEach(cleanupDocument);
+
+if (typeof afterEach === 'function') afterEach(resetJitOptions);

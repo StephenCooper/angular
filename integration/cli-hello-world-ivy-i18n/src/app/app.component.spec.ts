@@ -12,21 +12,21 @@ describe('AppComponent', () => {
 
   it('should create the app', () => {
     const fixture = TestBed.createComponent(AppComponent);
-    const app = fixture.debugElement.componentInstance;
+    const app = fixture.componentInstance;
     expect(app).toBeTruthy();
   });
 
-  it(`should have as title 'cli-hello-world-ivy-compat'`, () => {
+  it(`should have as title 'cli-hello-world-ivy-i18n'`, () => {
     const fixture = TestBed.createComponent(AppComponent);
-    const app = fixture.debugElement.componentInstance;
-    expect(app.title).toEqual('cli-hello-world-ivy-compat');
+    const app = fixture.componentInstance;
+    expect(app.title).toEqual('cli-hello-world-ivy-i18n');
   });
 
-  it('should render title in a h1 tag', () => {
+  it('should render title', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
     const compiled = fixture.debugElement.nativeElement;
     expect(compiled.querySelector('h1').textContent)
-        .toContain('Bonjour cli-hello-world-ivy-compat!');
+        .toContain('Hello cli-hello-world-ivy-i18n!');
   });
 });

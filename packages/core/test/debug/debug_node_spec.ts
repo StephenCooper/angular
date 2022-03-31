@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
@@ -8,29 +8,36 @@
 
 
 import {CommonModule, NgIfContext, ɵgetDOM as getDOM} from '@angular/common';
-import {Component, DebugElement, DebugNode, Directive, ElementRef, EmbeddedViewRef, EventEmitter, HostBinding, Injectable, Input, NO_ERRORS_SCHEMA, OnInit, Output, Renderer2, TemplateRef, ViewChild, ViewContainerRef} from '@angular/core';
-import {ComponentFixture, TestBed, async} from '@angular/core/testing';
+import {Component, DebugElement, DebugNode, Directive, ElementRef, EmbeddedViewRef, EventEmitter, HostBinding, Injectable, Input, NgZone, NO_ERRORS_SCHEMA, OnInit, Output, Renderer2, TemplateRef, ViewChild, ViewContainerRef} from '@angular/core';
+import {ComponentFixture, TestBed, waitForAsync} from '@angular/core/testing';
 import {By} from '@angular/platform-browser/src/dom/debug/by';
-import {hasClass} from '@angular/platform-browser/testing/src/browser_util';
+import {createMouseEvent, hasClass} from '@angular/platform-browser/testing/src/browser_util';
 import {expect} from '@angular/platform-browser/testing/src/matchers';
-import {ivyEnabled} from '@angular/private/testing';
 
 @Injectable()
 class Logger {
   logs: string[];
 
-  constructor() { this.logs = []; }
+  constructor() {
+    this.logs = [];
+  }
 
-  add(thing: string) { this.logs.push(thing); }
+  add(thing: string) {
+    this.logs.push(thing);
+  }
 }
 
 @Directive({selector: '[message]', inputs: ['message']})
 class MessageDir {
   logger: Logger;
 
-  constructor(logger: Logger) { this.logger = logger; }
+  constructor(logger: Logger) {
+    this.logger = logger;
+  }
 
-  set message(newMessage: string) { this.logger.add(newMessage); }
+  set message(newMessage: string) {
+    this.logger.add(newMessage);
+  }
 }
 
 @Directive({selector: '[with-title]', inputs: ['title']})
@@ -48,7 +55,9 @@ class WithTitleDir {
 class ChildComp {
   childBinding: string;
 
-  constructor() { this.childBinding = 'Original'; }
+  constructor() {
+    this.childBinding = 'Original';
+  }
 }
 
 @Component({
@@ -62,14 +71,18 @@ class ChildComp {
 })
 class ParentComp {
   parentBinding: string;
-  constructor() { this.parentBinding = 'OriginalParent'; }
+  constructor() {
+    this.parentBinding = 'OriginalParent';
+  }
 }
 
 @Directive({selector: 'custom-emitter', outputs: ['myevent']})
 class CustomEmitter {
   myevent: EventEmitter<any>;
 
-  constructor() { this.myevent = new EventEmitter(); }
+  constructor() {
+    this.myevent = new EventEmitter();
+  }
 }
 
 @Component({
@@ -86,9 +99,13 @@ class EventsComp {
     this.customed = false;
   }
 
-  handleClick() { this.clicked = true; }
+  handleClick() {
+    this.clicked = true;
+  }
 
-  handleCustom() { this.customed = true; }
+  handleCustom() {
+    this.customed = true;
+  }
 }
 
 @Component({
@@ -110,7 +127,9 @@ class ConditionalContentComp {
 })
 class ConditionalParentComp {
   parentBinding: string;
-  constructor() { this.parentBinding = 'OriginalParent'; }
+  constructor() {
+    this.parentBinding = 'OriginalParent';
+  }
 }
 
 @Component({
@@ -123,7 +142,9 @@ class ConditionalParentComp {
 })
 class UsingFor {
   stuff: string[];
-  constructor() { this.stuff = ['one', 'two', 'three']; }
+  constructor() {
+    this.stuff = ['one', 'two', 'three'];
+  }
 }
 
 @Directive({selector: '[mydir]', exportAs: 'mydir'})
@@ -153,12 +174,12 @@ class LocalsComp {
 })
 class BankAccount {
   // TODO(issue/24571): remove '!'.
-  @Input() bank !: string;
+  @Input() bank!: string;
   // TODO(issue/24571): remove '!'.
-  @Input('account') id !: string;
+  @Input('account') id!: string;
 
   // TODO(issue/24571): remove '!'.
-  normalizedBankName !: string;
+  normalizedBankName!: string;
 }
 
 @Component({
@@ -167,7 +188,7 @@ class BankAccount {
  `
 })
 class SimpleContentComp {
-  @ViewChild('content', {static: false}) content !: ElementRef;
+  @ViewChild('content') content!: ElementRef;
 }
 
 @Component({
@@ -185,16 +206,21 @@ class TestApp {
   width = 200;
   color = 'red';
   isClosed = true;
+  constructor(public renderer: Renderer2) {}
 }
 
 @Component({selector: 'test-cmpt', template: ``})
 class TestCmpt {
 }
 
+@Component({selector: 'test-cmpt-renderer', template: ``})
+class TestCmptWithRenderer {
+  constructor(public renderer: Renderer2) {}
+}
+
 @Component({selector: 'host-class-binding', template: ''})
 class HostClassBindingCmp {
-  @HostBinding('class')
-  hostClasses = 'class-one class-two';
+  @HostBinding('class') hostClasses = 'class-one class-two';
 }
 
 @Component({selector: 'test-cmpt-vcref', template: `<div></div>`})
@@ -237,7 +263,7 @@ class TestCmptWithPropInterpolation {
   describe('debug element', () => {
     let fixture: ComponentFixture<any>;
 
-    beforeEach(async(() => {
+    beforeEach(waitForAsync(() => {
       TestBed.configureTestingModule({
         declarations: [
           ChildComp,
@@ -258,6 +284,7 @@ class TestCmptWithPropInterpolation {
           SimpleContentComp,
           TestCmptWithPropBindings,
           TestCmptWithPropInterpolation,
+          TestCmptWithRenderer,
           WithTitleDir,
         ],
         providers: [Logger],
@@ -347,7 +374,7 @@ class TestCmptWithPropInterpolation {
       const bankElem = fixture.debugElement.children[0];
 
       expect(bankElem.classes['closed']).toBe(true);
-      expect(bankElem.classes['open']).toBe(false);
+      expect(bankElem.classes['open']).toBeFalsy();
     });
 
     it('should get element classes from host bindings', () => {
@@ -358,7 +385,23 @@ class TestCmptWithPropInterpolation {
       expect(debugElement.classes['present-class'])
           .toBe(true, 'Expected bound host CSS class "present-class" to be present');
       expect(debugElement.classes['absent-class'])
-          .toBe(false, 'Expected bound host CSS class "absent-class" to be absent');
+          .toBeFalsy('Expected bound host CSS class "absent-class" to be absent');
+    });
+
+    it('should list classes on SVG nodes', () => {
+      // Class bindings on SVG elements require a polyfill
+      // on IE which we don't include when running tests.
+      if (typeof SVGElement !== 'undefined' && !('classList' in SVGElement.prototype)) {
+        return;
+      }
+
+      TestBed.overrideTemplate(TestApp, `<svg [class.foo]="true" [class.bar]="true"></svg>`);
+      fixture = TestBed.createComponent(TestApp);
+      fixture.detectChanges();
+      const classes = fixture.debugElement.children[0].classes;
+
+      expect(classes['foo']).toBe(true);
+      expect(classes['bar']).toBe(true);
     });
 
     it('should list element styles', () => {
@@ -502,11 +545,15 @@ class TestCmptWithPropInterpolation {
       class ViewManipulatingDirective {
         constructor(private _vcRef: ViewContainerRef, private _tplRef: TemplateRef<any>) {}
 
-        insert() { this._vcRef.createEmbeddedView(this._tplRef); }
+        insert() {
+          this._vcRef.createEmbeddedView(this._tplRef);
+        }
 
         removeFromTheDom() {
           const viewRef = this._vcRef.get(0) as EmbeddedViewRef<any>;
-          viewRef.rootNodes.forEach(rootNode => { getDOM().remove(rootNode); });
+          viewRef.rootNodes.forEach(rootNode => {
+            getDOM().remove(rootNode);
+          });
         }
       }
 
@@ -570,38 +617,66 @@ class TestCmptWithPropInterpolation {
       expect(fixture.debugElement.query(By.css('.myclass'))).toBeTruthy();
     });
 
-    it('DebugElement.query should work with dynamically created descendant elements', () => {
-      @Directive({
-        selector: '[dir]',
-      })
-      class MyDir {
-        @Input('dir') dir: number|undefined;
-
-        constructor(renderer: Renderer2, element: ElementRef) {
-          const outerDiv = renderer.createElement('div');
-          const innerDiv = renderer.createElement('div');
-          const div = renderer.createElement('div');
-
-          div.classList.add('myclass');
-
-          renderer.appendChild(innerDiv, div);
-          renderer.appendChild(outerDiv, innerDiv);
-          renderer.appendChild(element.nativeElement, outerDiv);
-        }
-      }
-
-      @Component({
-        selector: 'app-test',
-        template: '<div dir></div>',
-      })
-      class MyComponent {
-      }
-
-      TestBed.configureTestingModule({declarations: [MyComponent, MyDir]});
-      const fixture = TestBed.createComponent(MyComponent);
+    it('should not throw when calling DebugRenderer2.destroyNode twice in a row', () => {
+      const fixture = TestBed.createComponent(TestApp);
       fixture.detectChanges();
+      const firstChild = fixture.debugElement.children[0];
+      const renderer = fixture.componentInstance.renderer;
 
-      expect(fixture.debugElement.query(By.css('.myclass'))).toBeTruthy();
+      expect(firstChild).toBeTruthy();
+      expect(() => {
+        // `destroyNode` needs to be null checked, because only ViewEngine provides a
+        // `DebugRenderer2` which has the behavior we're testing for. Ivy provides
+        // `BaseAnimationRenderer` which doesn't have the issue.
+        renderer.destroyNode?.(firstChild);
+        renderer.destroyNode?.(firstChild);
+      }).not.toThrow();
+    });
+
+    describe('DebugElement.query with dynamically created descendant elements', () => {
+      let fixture: ComponentFixture<{}>;
+      beforeEach(() => {
+        @Directive({
+          selector: '[dir]',
+        })
+        class MyDir {
+          @Input('dir') dir: number|undefined;
+
+          constructor(renderer: Renderer2, element: ElementRef) {
+            const outerDiv = renderer.createElement('div');
+            const innerDiv = renderer.createElement('div');
+            innerDiv.classList.add('inner');
+            const div = renderer.createElement('div');
+
+            div.classList.add('myclass');
+
+            renderer.appendChild(innerDiv, div);
+            renderer.appendChild(outerDiv, innerDiv);
+            renderer.appendChild(element.nativeElement, outerDiv);
+          }
+        }
+
+        @Component({
+          selector: 'app-test',
+          template: '<div dir></div>',
+        })
+        class MyComponent {
+        }
+
+        TestBed.configureTestingModule({declarations: [MyComponent, MyDir]});
+        fixture = TestBed.createComponent(MyComponent);
+        fixture.detectChanges();
+      });
+
+      it('should find the dynamic elements from fixture root', () => {
+        expect(fixture.debugElement.query(By.css('.myclass'))).toBeTruthy();
+      });
+
+      it('can use a dynamic element as root for another query', () => {
+        const inner = fixture.debugElement.query(By.css('.inner'));
+        expect(inner).toBeTruthy();
+        expect(inner.query(By.css('.myclass'))).toBeTruthy();
+      });
     });
 
     describe('DebugElement.query doesn\'t fail on elements outside Angular context', () => {
@@ -610,7 +685,9 @@ class TestCmptWithPropInterpolation {
         constructor(private elementRef: ElementRef) {}
 
         ngAfterViewInit() {
-          this.elementRef.nativeElement.children[0].appendChild(document.createElement('p'));
+          const ul = document.createElement('ul');
+          ul.appendChild(document.createElement('li'));
+          this.elementRef.nativeElement.children[0].appendChild(ul);
         }
       }
 
@@ -622,15 +699,17 @@ class TestCmptWithPropInterpolation {
         el = fixture.debugElement;
       });
 
-      it('when searching for elements by name',
-         () => { expect(() => el.query(e => e.name === 'any search text')).not.toThrow(); });
-
-      it('when searching for elements by their attributes', () => {
-        expect(() => el.query(e => e.attributes !['name'] === 'any attribute')).not.toThrow();
+      it('when searching for elements by name', () => {
+        expect(() => el.query(e => e.name === 'any search text')).not.toThrow();
       });
 
-      it('when searching for elements by their classes',
-         () => { expect(() => el.query(e => e.classes['any class'] === true)).not.toThrow(); });
+      it('when searching for elements by their attributes', () => {
+        expect(() => el.query(e => e.attributes!['name'] === 'any attribute')).not.toThrow();
+      });
+
+      it('when searching for elements by their classes', () => {
+        expect(() => el.query(e => e.classes['any class'] === true)).not.toThrow();
+      });
 
       it('when searching for elements by their styles', () => {
         expect(() => el.query(e => e.styles['any style'] === 'any value')).not.toThrow();
@@ -640,23 +719,35 @@ class TestCmptWithPropInterpolation {
         expect(() => el.query(e => e.properties['any prop'] === 'any value')).not.toThrow();
       });
 
-      it('when searching by componentInstance',
-         () => { expect(() => el.query(e => e.componentInstance === null)).not.toThrow(); });
+      it('when searching by componentInstance', () => {
+        expect(() => el.query(e => e.componentInstance === null)).not.toThrow();
+      });
 
-      it('when searching by context',
-         () => { expect(() => el.query(e => e.context === null)).not.toThrow(); });
+      it('when searching by context', () => {
+        expect(() => el.query(e => e.context === null)).not.toThrow();
+      });
 
-      it('when searching by listeners',
-         () => { expect(() => el.query(e => e.listeners.length === 0)).not.toThrow(); });
+      it('when searching by listeners', () => {
+        expect(() => el.query(e => e.listeners.length === 0)).not.toThrow();
+      });
 
-      it('when searching by references',
-         () => { expect(() => el.query(e => e.references === null)).not.toThrow(); });
+      it('when searching by references', () => {
+        expect(() => el.query(e => e.references === null)).not.toThrow();
+      });
 
-      it('when searching by providerTokens',
-         () => { expect(() => el.query(e => e.providerTokens.length === 0)).not.toThrow(); });
+      it('when searching by providerTokens', () => {
+        expect(() => el.query(e => e.providerTokens.length === 0)).not.toThrow();
+      });
 
-      it('when searching by injector',
-         () => { expect(() => el.query(e => e.injector === null)).not.toThrow(); });
+      it('when searching by injector', () => {
+        expect(() => el.query(e => e.injector === null)).not.toThrow();
+      });
+
+      it('when using the out-of-context element as the DebugElement query root', () => {
+        const debugElOutsideAngularContext = el.query(By.css('ul'));
+        expect(debugElOutsideAngularContext.queryAll(By.css('li')).length).toBe(1);
+        expect(debugElOutsideAngularContext.query(By.css('li'))).toBeDefined();
+      });
     });
 
     it('DebugElement.queryAll should pick up both elements inserted via the view and through Renderer2',
@@ -701,7 +792,7 @@ class TestCmptWithPropInterpolation {
       fixture = TestBed.createComponent(LocalsComp);
       fixture.detectChanges();
 
-      expect(fixture.debugElement.children[0].references !['alice']).toBeAnInstanceOf(MyDir);
+      expect(fixture.debugElement.children[0].references!['alice']).toBeAnInstanceOf(MyDir);
     });
 
     it('should allow injecting from the element injector', () => {
@@ -735,73 +826,121 @@ class TestCmptWithPropInterpolation {
       expect(fixture.componentInstance.customed).toBe(true);
     });
 
-    it('should include classes in properties.className', () => {
-      fixture = TestBed.createComponent(HostClassBindingCmp);
-      fixture.detectChanges();
+    describe('properties', () => {
+      it('should include classes in properties.className', () => {
+        fixture = TestBed.createComponent(HostClassBindingCmp);
+        fixture.detectChanges();
 
-      const debugElement = fixture.debugElement;
+        const debugElement = fixture.debugElement;
 
-      expect(debugElement.properties.className).toBe('class-one class-two');
+        expect(debugElement.properties.className).toBe('class-one class-two');
 
-      fixture.componentInstance.hostClasses = 'class-three';
-      fixture.detectChanges();
+        fixture.componentInstance.hostClasses = 'class-three';
+        fixture.detectChanges();
 
-      expect(debugElement.properties.className).toBe('class-three');
+        expect(debugElement.properties.className).toBe('class-three');
 
-      fixture.componentInstance.hostClasses = '';
-      fixture.detectChanges();
+        fixture.componentInstance.hostClasses = '';
+        fixture.detectChanges();
 
-      expect(debugElement.properties.className).toBeFalsy();
-    });
+        expect(debugElement.properties.className).toBeFalsy();
+      });
 
-    it('should preserve the type of the property values', () => {
-      const fixture = TestBed.createComponent(TestCmptWithPropBindings);
-      fixture.detectChanges();
+      it('should preserve the type of the property values', () => {
+        const fixture = TestBed.createComponent(TestCmptWithPropBindings);
+        fixture.detectChanges();
 
-      const button = fixture.debugElement.query(By.css('button'));
-      expect(button.properties).toEqual({disabled: true, tabIndex: 1337, title: 'hello'});
-    });
+        const button = fixture.debugElement.query(By.css('button'));
+        expect(button.properties.disabled).toEqual(true);
+        expect(button.properties.tabIndex).toEqual(1337);
+        expect(button.properties.title).toEqual('hello');
+      });
 
-    it('should include interpolated properties in the properties map', () => {
-      const fixture = TestBed.createComponent(TestCmptWithPropInterpolation);
-      fixture.detectChanges();
+      it('should include interpolated properties in the properties map', () => {
+        const fixture = TestBed.createComponent(TestCmptWithPropInterpolation);
+        fixture.detectChanges();
 
-      const buttons = fixture.debugElement.children;
+        const buttons = fixture.debugElement.children;
 
-      expect(buttons.length).toBe(10);
-      expect(buttons[0].properties.title).toBe('0');
-      expect(buttons[1].properties.title).toBe('a1b');
-      expect(buttons[2].properties.title).toBe('a1b2c');
-      expect(buttons[3].properties.title).toBe('a1b2c3d');
-      expect(buttons[4].properties.title).toBe('a1b2c3d4e');
-      expect(buttons[5].properties.title).toBe('a1b2c3d4e5f');
-      expect(buttons[6].properties.title).toBe('a1b2c3d4e5f6g');
-      expect(buttons[7].properties.title).toBe('a1b2c3d4e5f6g7h');
-      expect(buttons[8].properties.title).toBe('a1b2c3d4e5f6g7h8i');
-      expect(buttons[9].properties.title).toBe('a1b2c3d4e5f6g7h8i9j');
-    });
+        expect(buttons.length).toBe(10);
+        expect(buttons[0].properties.title).toBe('0');
+        expect(buttons[1].properties.title).toBe('a1b');
+        expect(buttons[2].properties.title).toBe('a1b2c');
+        expect(buttons[3].properties.title).toBe('a1b2c3d');
+        expect(buttons[4].properties.title).toBe('a1b2c3d4e');
+        expect(buttons[5].properties.title).toBe('a1b2c3d4e5f');
+        expect(buttons[6].properties.title).toBe('a1b2c3d4e5f6g');
+        expect(buttons[7].properties.title).toBe('a1b2c3d4e5f6g7h');
+        expect(buttons[8].properties.title).toBe('a1b2c3d4e5f6g7h8i');
+        expect(buttons[9].properties.title).toBe('a1b2c3d4e5f6g7h8i9j');
+      });
 
-    it('should not include directive-shadowed properties in the properties map', () => {
-      TestBed.overrideTemplate(
-          TestCmptWithPropInterpolation, `<button with-title [title]="'goes to input'"></button>`);
-      const fixture = TestBed.createComponent(TestCmptWithPropInterpolation);
-      fixture.detectChanges();
+      it('should not include directive-shadowed properties in the properties map', () => {
+        TestBed.overrideTemplate(
+            TestCmptWithPropInterpolation,
+            `<button with-title [title]="'goes to input'"></button>`);
+        const fixture = TestBed.createComponent(TestCmptWithPropInterpolation);
+        fixture.detectChanges();
 
-      const button = fixture.debugElement.query(By.css('button'));
-      expect(button.properties.title).toBeUndefined();
+        const button = fixture.debugElement.query(By.css('button'));
+        expect(button.properties.title).not.toEqual('goes to input');
+      });
+
+      it('should return native properties from DOM element even if no binding present', () => {
+        TestBed.overrideTemplate(TestCmptWithRenderer, `<button></button>`);
+        const fixture = TestBed.createComponent(TestCmptWithRenderer);
+        fixture.detectChanges();
+        const button = fixture.debugElement.query(By.css('button'));
+        fixture.componentInstance.renderer.setProperty(button.nativeElement, 'title', 'myTitle');
+        expect(button.properties.title).toBe('myTitle');
+      });
+
+      it('should not include patched properties (starting with __) and on* properties', () => {
+        TestBed.overrideTemplate(
+            TestCmptWithPropInterpolation, `<button title="myTitle" (click)="true;"></button>`);
+        const fixture = TestBed.createComponent(TestCmptWithPropInterpolation);
+        fixture.detectChanges();
+
+        const host = fixture.debugElement;
+        const button = fixture.debugElement.query(By.css('button'));
+        expect(Object.keys(host.properties).filter(key => key.startsWith('__'))).toEqual([]);
+        expect(Object.keys(host.properties).filter(key => key.startsWith('on'))).toEqual([]);
+        expect(Object.keys(button.properties).filter(key => key.startsWith('__'))).toEqual([]);
+        expect(Object.keys(button.properties).filter(key => key.startsWith('on'))).toEqual([]);
+      });
+
+      it('should pickup all of the element properties', () => {
+        TestBed.overrideTemplate(
+            TestCmptWithPropInterpolation, `<button title="myTitle"></button>`);
+        const fixture = TestBed.createComponent(TestCmptWithPropInterpolation);
+        fixture.detectChanges();
+
+        const host = fixture.debugElement;
+        const button = fixture.debugElement.query(By.css('button'));
+
+        expect(button.properties.title).toEqual('myTitle');
+      });
     });
 
     it('should trigger events registered via Renderer2', () => {
       @Component({template: ''})
       class TestComponent implements OnInit {
         count = 0;
-        eventObj: any;
-        constructor(private renderer: Renderer2, private elementRef: ElementRef) {}
+        eventObj1: any;
+        eventObj2: any;
+        constructor(
+            private renderer: Renderer2, private elementRef: ElementRef, private ngZone: NgZone) {}
 
         ngOnInit() {
           this.renderer.listen(this.elementRef.nativeElement, 'click', (event: any) => {
             this.count++;
-            this.eventObj = event;
+            this.eventObj1 = event;
+          });
+          this.ngZone.runOutsideAngular(() => {
+            this.renderer.listen(this.elementRef.nativeElement, 'click', (event: any) => {
+              this.count++;
+              this.eventObj2 = event;
+            });
           });
         }
       }
@@ -812,12 +951,12 @@ class TestCmptWithPropInterpolation {
       // Ivy depends on `eventListeners` to pick up events that haven't been registered through
       // Angular templates. At the time of writing Zone.js doesn't add `eventListeners` in Node
       // environments so we have to skip the test.
-      if (!ivyEnabled || typeof fixture.debugElement.nativeElement.eventListeners === 'function') {
+      if (typeof fixture.debugElement.nativeElement.eventListeners === 'function') {
         const event = {value: true};
         fixture.detectChanges();
         fixture.debugElement.triggerEventHandler('click', event);
-        expect(fixture.componentInstance.count).toBe(1);
-        expect(fixture.componentInstance.eventObj).toBe(event);
+        expect(fixture.componentInstance.count).toBe(2);
+        expect(fixture.componentInstance.eventObj2).toBe(event);
       }
     });
 
@@ -839,15 +978,14 @@ class TestCmptWithPropInterpolation {
       const button = fixture.debugElement.query(By.css('button'));
 
       expect(() => {
-        button.triggerEventHandler('click', null);
+        button.triggerEventHandler('click');
         fixture.detectChanges();
       }).not.toThrow();
 
-      expect(value).toBeNull();
+      expect(value).toBeUndefined();
     });
 
     describe('componentInstance on DebugNode', () => {
-
       it('should return component associated with a node if a node is a component host', () => {
         TestBed.overrideTemplate(TestCmpt, `<parent-comp></parent-comp>`);
         fixture = TestBed.createComponent(TestCmpt);
@@ -1105,7 +1243,9 @@ class TestCmptWithPropInterpolation {
       })
       class App {
         visible = true;
-        cancel() { calls++; }
+        cancel() {
+          calls++;
+        }
       }
 
       TestBed.configureTestingModule({declarations: [App, CancelButton]});
@@ -1124,7 +1264,6 @@ class TestCmptWithPropInterpolation {
 
       expect(calls).toBe(1, 'Expected calls to stay 1 after destroying the node.');
     });
-
   });
 
   it('should not error when accessing node name', () => {
@@ -1140,7 +1279,7 @@ class TestCmptWithPropInterpolation {
     // Node.ELEMENT_NODE
     while (node) {
       superParentName = node.name;
-      node = node.parent !;
+      node = node.parent!;
     }
     expect(superParentName).not.toEqual('');
   });
@@ -1158,5 +1297,27 @@ class TestCmptWithPropInterpolation {
                         .createComponent(Wrapper);
     expect(fixture.debugElement.query(e => e.name === 'myComponent')).toBeTruthy();
     expect(fixture.debugElement.query(e => e.name === 'div')).toBeTruthy();
+  });
+
+  it('does not call event listeners added outside angular context', () => {
+    let listenerCalled = false;
+    const eventToTrigger = createMouseEvent('mouseenter');
+    function listener() {
+      listenerCalled = true;
+    }
+    @Component({template: ''})
+    class MyComp {
+      constructor(private readonly zone: NgZone, private readonly element: ElementRef) {}
+      ngOnInit() {
+        this.zone.runOutsideAngular(() => {
+          this.element.nativeElement.addEventListener('mouseenter', listener);
+        });
+      }
+    }
+    const fixture =
+        TestBed.configureTestingModule({declarations: [MyComp]}).createComponent(MyComp);
+    fixture.detectChanges();
+    fixture.debugElement.triggerEventHandler('mouseenter', eventToTrigger);
+    expect(listenerCalled).toBe(false);
   });
 }

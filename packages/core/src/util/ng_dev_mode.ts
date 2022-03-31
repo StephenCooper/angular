@@ -1,15 +1,12 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 
 import {global} from './global';
-
-// Do not remove: needed for closure to be able to properly tree-shake ngDevMode.
-// goog.define
 
 declare global {
   /**
@@ -29,7 +26,7 @@ declare global {
   const ngDevMode: null|NgDevModePerfCounters;
   interface NgDevModePerfCounters {
     namedConstructors: boolean;
-    firstTemplatePass: number;
+    firstCreatePass: number;
     tNode: number;
     tView: number;
     rendererCreateTextNode: number;
@@ -51,17 +48,6 @@ declare global {
     rendererAppendChild: number;
     rendererInsertBefore: number;
     rendererCreateComment: number;
-    styleMap: number;
-    styleMapCacheMiss: number;
-    classMap: number;
-    classMapCacheMiss: number;
-    styleProp: number;
-    stylePropCacheMiss: number;
-    classProp: number;
-    classPropCacheMiss: number;
-    flushStyling: number;
-    classesApplied: number;
-    stylesApplied: number;
   }
 }
 
@@ -69,7 +55,7 @@ export function ngDevModeResetPerfCounters(): NgDevModePerfCounters {
   const locationString = typeof location !== 'undefined' ? location.toString() : '';
   const newCounters: NgDevModePerfCounters = {
     namedConstructors: locationString.indexOf('ngDevMode=namedConstructors') != -1,
-    firstTemplatePass: 0,
+    firstCreatePass: 0,
     tNode: 0,
     tView: 0,
     rendererCreateTextNode: 0,
@@ -91,17 +77,6 @@ export function ngDevModeResetPerfCounters(): NgDevModePerfCounters {
     rendererAppendChild: 0,
     rendererInsertBefore: 0,
     rendererCreateComment: 0,
-    styleMap: 0,
-    styleMapCacheMiss: 0,
-    classMap: 0,
-    classMapCacheMiss: 0,
-    styleProp: 0,
-    stylePropCacheMiss: 0,
-    classProp: 0,
-    classPropCacheMiss: 0,
-    flushStyling: 0,
-    classesApplied: 0,
-    stylesApplied: 0,
   };
 
   // Make sure to refer to ngDevMode as ['ngDevMode'] for closure.
@@ -122,7 +97,7 @@ export function ngDevModeResetPerfCounters(): NgDevModePerfCounters {
  * (and thus Ivy instructions), so a single initialization there is sufficient to ensure ngDevMode
  * is defined for the entire instruction set.
  *
- * When using checking `ngDevMode` on toplevel, always init it before referencing it
+ * When checking `ngDevMode` on toplevel, always init it before referencing it
  * (e.g. `((typeof ngDevMode === 'undefined' || ngDevMode) && initNgDevMode())`), otherwise you can
  *  get a `ReferenceError` like in https://github.com/angular/angular/issues/31595.
  *
@@ -140,7 +115,7 @@ export function initNgDevMode(): boolean {
     if (typeof ngDevMode !== 'object') {
       ngDevModeResetPerfCounters();
     }
-    return !!ngDevMode;
+    return typeof ngDevMode !== 'undefined' && !!ngDevMode;
   }
   return false;
 }

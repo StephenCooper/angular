@@ -1,90 +1,14 @@
-# Dependency Injection in Action
+# Dependency injection in action
 
-This section explores many of the features of dependency injection (DI) in Angular.
-{@a toc}
-
-See the <live-example name="dependency-injection-in-action"></live-example>
-of the code in this cookbook.
-
-{@a nested-dependencies}
-
-## Nested service dependencies
-
-The _consumer_ of an injected service doesn't need to know how to create that service.
-It's the job of the DI framework to create and cache dependencies. The consumer just
-needs to let the DI framework know which dependencies it needs.
-
-Sometimes a service depends on other services, which may depend on yet other services.
-The dependency injection framework resolves these nested dependencies in the correct order.
-At each step, the consumer of dependencies declares what it requires in its
-constructor, and lets the framework provide them.
-
-The following example shows that `AppComponent` declares its dependence on `LoggerService` and `UserContext`.
-
-<code-example path="dependency-injection-in-action/src/app/app.component.ts" region="ctor" header="src/app/app.component.ts"></code-example>
-
-
-`UserContext` in turn depends on both `LoggerService` and
-`UserService`, another service that gathers information about a particular user.
-
-
-<code-example path="dependency-injection-in-action/src/app/user-context.service.ts" region="injectables" header="user-context.service.ts (injection)"></code-example>
-
-
-When Angular creates `AppComponent`, the DI framework creates an instance of `LoggerService` and starts to create `UserContextService`.
-`UserContextService` also needs `LoggerService`, which the framework already has, so the framework can provide the same instance. `UserContextService` also needs `UserService`, which the framework has yet to create. `UserService` has no further dependencies, so the framework can simply use `new` to instantiate the class and provide the instance to the `UserContextService` constructor.
-
-The parent `AppComponent` doesn't need to know about the dependencies of dependencies.
-Declare what's needed in the constructor (in this case `LoggerService` and `UserContextService`)
-and the framework resolves the nested dependencies.
-
-When all dependencies are in place, `AppComponent` displays the user information.
-
-<figure>
-  <img src="generated/images/guide/dependency-injection-in-action/logged-in-user.png" alt="Logged In User">
-</figure>
-
-{@a service-scope}
-
-## Limit service scope to a component subtree
-
-An Angular application has multiple injectors, arranged in a tree hierarchy that parallels the component tree.
-Each injector creates a singleton instance of a dependency.
-That same instance is injected wherever that injector provides that service.
-A particular service can be provided and created at any level of the injector hierarchy,
-which means that there can be multiple instances of a service if it is provided by multiple injectors.
-
-Dependencies provided by the root injector can be injected into *any* component *anywhere* in the application.
-In some cases, you might want to restrict service availability to a particular region of the application.
-For instance, you might want to let users explicitly opt in to use a service,
-rather than letting the root injector provide it automatically.
-
-You can limit the scope of an injected service to a *branch* of the application hierarchy
-by providing that service *at the sub-root component for that branch*.
-This example shows how to make a different instance of `HeroService` available to `HeroesBaseComponent`
-by adding it to the `providers` array of the `@Component()` decorator of the sub-component.
-
-<code-example path="dependency-injection-in-action/src/app/sorted-heroes.component.ts" region="injection" header="src/app/sorted-heroes.component.ts (HeroesBaseComponent excerpt)">
-
-</code-example>
-
-When Angular creates `HeroesBaseComponent`, it also creates a new instance of `HeroService`
-that is visible only to that component and its children, if any.
-
-You could also provide `HeroService` to a different component elsewhere in the application.
-That would result in a different instance of the service, living in a different injector.
+This guide explores many of the features of dependency injection (DI) in Angular.
 
 <div class="alert is-helpful">
 
-Examples of such scoped `HeroService` singletons appear throughout the accompanying sample code,
-including `HeroBiosComponent`, `HeroOfTheMonthComponent`, and `HeroesBaseComponent`.
-Each of these components has its own `HeroService` instance managing its own independent collection of heroes.
+See the <live-example></live-example> for a working example containing the code snippets in this guide.
 
 </div>
 
-
 {@a multiple-service-instances}
-
 
 ## Multiple service instances (sandboxing)
 
@@ -131,9 +55,9 @@ The template displays this data-bound property.
 Find this example in <live-example name="dependency-injection-in-action">live code</live-example>
 and confirm that the three `HeroBioComponent` instances have their own cached hero data.
 
-<figure>
+<div class="lightbox">
   <img src="generated/images/guide/dependency-injection-in-action/hero-bios.png" alt="Bios">
-</figure>
+</div>
 
 {@a qualify-dependency-lookup}
 
@@ -142,7 +66,7 @@ and confirm that the three `HeroBioComponent` instances have their own cached he
 When a class requires a dependency, that dependency is added to the constructor as a parameter.
 When Angular needs to instantiate the class, it calls upon the DI framework to supply the dependency.
 By default, the DI framework searches for a provider in the injector hierarchy,
-starting at the component's local injector of the component, and if necessary bubbling up
+starting at the component's local injector, and if necessary bubbling up
 through the injector tree until it reaches the root injector.
 
 * The first injector configured with a provider supplies the dependency (a service instance or value) to the constructor.
@@ -191,9 +115,9 @@ placing it in the `<ng-content>` slot of the `HeroBioComponent` template.
 
 The result is shown below, with the hero's telephone number from `HeroContactComponent` projected above the hero description.
 
-<figure>
+<div class="lightbox">
   <img src="generated/images/guide/dependency-injection-in-action/hero-bio-and-content.png" alt="bio and contact">
-</figure>
+</div>
 
 
 Here's `HeroContactComponent`, which demonstrates the qualifying decorators.
@@ -212,7 +136,7 @@ Angular throws an error if the parent lacks that service, even if a component hi
 in the component tree includes it.
 
 A second `@Host()` function decorates the `loggerService` constructor property.
-The only `LoggerService` instance in the app is provided at the `AppComponent` level.
+The only `LoggerService` instance in the application is provided at the `AppComponent` level.
 The host `HeroBioComponent` doesn't have its own `LoggerService` provider.
 
 Angular throws an error if you haven't also decorated the property with `@Optional()`.
@@ -221,9 +145,9 @@ When the property is marked as optional, Angular sets `loggerService` to null an
 
 Here's `HeroBiosAndContactsComponent` in action.
 
-<figure>
+<div class="lightbox">
   <img src="generated/images/guide/dependency-injection-in-action/hero-bios-and-contacts.png" alt="Bios with contact into">
-</figure>
+</div>
 
 
 
@@ -232,13 +156,13 @@ until it finds the logger at the `AppComponent` level.
 The logger logic kicks in and the hero display updates
 with the "!!!" marker to indicate that the logger was found.
 
-<figure>
+<div class="lightbox">
   <img src="generated/images/guide/dependency-injection-in-action/hero-bio-contact-no-host.png" alt="Without @Host">
-</figure>
+</div>
 
 
 If you restore the `@Host()` decorator and comment out `@Optional`,
-the app throws an exception when it cannot find the required logger at the host component level.
+the application throws an exception when it cannot find the required logger at the host component level.
 
 `EXCEPTION: No provider for LoggerService! (HeroContactComponent -> LoggerService)`
 
@@ -250,7 +174,7 @@ Using a custom provider allows you to provide a concrete implementation for impl
 
 </code-example>
 
-The `factory` function returns the `localStorage` property that is attached to the browser window object. The `Inject` decorator is a constructor parameter used to specify a custom provider of a dependency. This custom provider can now be overridden during testing with a mock API of `localStorage` instead of interactive with real browser APIs.
+The `factory` function returns the `localStorage` property that is attached to the browser window object. The `Inject` decorator is a constructor parameter used to specify a custom provider of a dependency. This custom provider can now be overridden during testing with a mock API of `localStorage` instead of interacting with real browser APIs.
 
 {@a skip}
 
@@ -262,7 +186,7 @@ Providers can also be scoped by injector through constructor parameter decorator
 
 </code-example>
 
-Using the `@Self` decorator, the injector only looks at the component's injector for its providers. The `@SkipSelf` decorator allows you to skip the local injector and look up in the hierarchy to find a provider that satisfies this dependency. The `sessionStorageService` instance interacts with the `BrowserStorageService` using the `sessionStorage` browser API, while the `localStorageService` skips the local injector and uses the root `BrowserStorageService` that uses the `localStorage` browswer API.
+Using the `@Self` decorator, the injector only looks at the component's injector for its providers. The `@SkipSelf` decorator allows you to skip the local injector and look up in the hierarchy to find a provider that satisfies this dependency. The `sessionStorageService` instance interacts with the `BrowserStorageService` using the `sessionStorage` browser API, while the `localStorageService` skips the local injector and uses the root `BrowserStorageService` that uses the `localStorage` browser API.
 
 {@a component-element}
 
@@ -272,7 +196,7 @@ Although developers strive to avoid it, many visual effects and third-party tool
 require DOM access.
 As a result, you might need to access a component's DOM element.
 
-To illustrate, here's a simplified version of `HighlightDirective` from
+To illustrate, here's a minimal version of `HighlightDirective` from
 the [Attribute Directives](guide/attribute-directives) page.
 
 <code-example path="dependency-injection-in-action/src/app/highlight.directive.ts" header="src/app/highlight.directive.ts">
@@ -286,7 +210,7 @@ Angular sets the constructor's `el` parameter to the injected `ElementRef`.
 (An `ElementRef` is a wrapper around a DOM element,
 whose `nativeElement` property exposes the DOM element for the directive to manipulate.)
 
-The sample code applies the directive's `myHighlight` attribute to two `<div>` tags,
+The sample code applies the directive's `appHighlight` attribute to two `<div>` tags,
 first without a value (yielding the default color) and then with an assigned color value.
 
 <code-example path="dependency-injection-in-action/src/app/app.component.html" region="highlight" header="src/app/app.component.html (highlight)"></code-example>
@@ -294,49 +218,9 @@ first without a value (yielding the default color) and then with an assigned col
 
 The following image shows the effect of mousing over the `<hero-bios-and-contacts>` tag.
 
-<figure>
+<div class="lightbox">
   <img src="generated/images/guide/dependency-injection-in-action/highlight.png" alt="Highlighted bios">
-</figure>
-
-{@a providers}
-
-
-## Define dependencies with providers
-
-This section demonstrates how to write providers that deliver dependent services.
-
-In order to get a service from a dependency injector, you have to give it a [token](guide/glossary#token).
-Angular usually handles this transaction by specifying a constructor parameter and its type.
-The parameter type serves as the injector lookup token.
-Angular passes this token to the injector and assigns the result to the parameter.
-
-The following is a typical example.
-
-
-<code-example path="dependency-injection-in-action/src/app/hero-bios.component.ts" region="ctor" header="src/app/hero-bios.component.ts (component constructor injection)"></code-example>
-
-
-Angular asks the injector for the service associated with `LoggerService`
-and assigns the returned value to the `logger` parameter.
-
-If the injector has already cached an instance of the service associated with the token,
-it provides that instance.
-If it doesn't, it needs to make one using the provider associated with the token.
-
-<div class="alert is-helpful">
-
-If the injector doesn't have a provider for a requested token, it delegates the request
-to its parent injector, where the process repeats until there are no more injectors.
-If the search fails, the injector throws an error&mdash;unless the request was [optional](guide/dependency-injection-in-action#optional).
-
-
 </div>
-
-A new injector has no providers.
-Angular initializes the injectors it creates with a set of preferred providers.
-You have to configure providers for your own app-specific dependencies.
-
-
 {@a defining-providers}
 
 
@@ -347,9 +231,9 @@ You learned about some other methods in [Dependency Providers](guide/dependency-
 The following `HeroOfTheMonthComponent` example demonstrates many of the alternatives and why you need them.
 It's visually simple: a few properties and the logs produced by a logger.
 
-<figure>
+<div class="lightbox">
   <img src="generated/images/guide/dependency-injection-in-action/hero-of-month.png" alt="Hero of the month">
-</figure>
+</div>
 
 The code behind it customizes how and where the DI framework provides dependencies.
 The use cases illustrate different ways to use the [*provide* object literal](guide/dependency-injection-providers#provide) to associate a definition object with a DI token.
@@ -460,9 +344,9 @@ The following example puts `MinimalLogger` to use in a simplified version of `He
 
 The `HeroOfTheMonthComponent` constructor's `logger` parameter is typed as `MinimalLogger`, so only the `logs` and `logInfo` members are visible in a TypeScript-aware editor.
 
-<figure>
+<div class="lightbox">
   <img src="generated/images/guide/dependency-injection-in-action/minimal-logger-intellisense.png" alt="MinimalLogger restricted API">
-</figure>
+</div>
 
 
 Behind the scenes, Angular sets the `logger` parameter to the full service registered under the `LoggingService` token, which happens to be the `DateLoggerService` instance that was [provided above](guide/dependency-injection-in-action#useclass).
@@ -472,9 +356,9 @@ Behind the scenes, Angular sets the `logger` parameter to the full service regis
 
 This is illustrated in the following image, which displays the logging date.
 
-<figure>
+<div class="lightbox">
   <img src="generated/images/guide/dependency-injection-in-action/date-logger-entry.png" alt="DateLoggerService entry">
-</figure>
+</div>
 
 </div>
 
@@ -556,19 +440,19 @@ as the token for a provider of `LoggerService`.
 
 An abstract class is usually a base class that you can extend.
 In this app, however there is no class that inherits from `MinimalLogger`.
-The `LoggerService` and the `DateLoggerService`could have inherited from `MinimalLogger`,
+The `LoggerService` and the `DateLoggerService` could have inherited from `MinimalLogger`,
 or they could have implemented it instead, in the manner of an interface.
 But they did neither.
 `MinimalLogger` is used only as a dependency injection token.
 
 When you use a class this way, it's called a *class interface*.
 
-As mentioned in [DI Providers](guide/dependency-injection-providers#interface-not-valid-token),
+As mentioned in [DI Providers](guide/dependency-injection-providers#di-and-interfaces),
 an interface is not a valid DI token because it is a TypeScript artifact that doesn't exist at run time.
 Use this abstract class interface to get the strong typing of an interface,
 and also use it as a provider token in the way you would a normal class.
 
-A  class interface should define *only* the members that its consumers are allowed to call.
+A class interface should define *only* the members that its consumers are allowed to call.
 Such a narrowing interface helps decouple the concrete class from its consumers.
 
 
@@ -627,9 +511,9 @@ and then pass them down to the base class through the constructor.
 In this contrived example, `SortedHeroesComponent` inherits from `HeroesBaseComponent`
 to display a *sorted* list of heroes.
 
-<figure>
+<div class="lightbox">
   <img src="generated/images/guide/dependency-injection-in-action/sorted-heroes.png" alt="Sorted Heroes">
-</figure>
+</div>
 
 The `HeroesBaseComponent` can stand on its own.
 It demands its own instance of `HeroService` to get heroes
@@ -700,53 +584,3 @@ appear *above* the class definition.
 Break the circularity with `forwardRef`.
 
 <code-example path="dependency-injection-in-action/src/app/parent-finder.component.ts" region="alex-providers" header="parent-finder.component.ts (AlexComponent providers)"></code-example>
-
-
-<!--- Waiting for good examples
-
-{@a directive-level-providers}
-
-{@a element-level-providers}
-
-## Element-level providers
-
-A component is a specialization of directive, and the `@Component()` decorator inherits the `providers` property from `@Directive`. The injector is at the element level, so a provider configured with any element-level injector is available to any component, directive, or pipe attached to the same element.
-
-Here's a live example that implements a custom form control, taking advantage of an injector that is shared by a component and a directive on the same element.
-
-https://stackblitz.com/edit/basic-form-control
-
-The component, `custom-control`, configures a provider for the DI token `NG_VALUE_ACCESSOR`.
-In the template, the `FormControlName` directive is instantiated along with the custom component.
-It can inject the `NG_VALUE_ACCESSOR` dependency because they share the same injector.
-(Notice that this example also makes use of `forwardRef()` to resolve a circularity in the definitions.)
-
-### Sharing a service among components
-
-__NEED TO TURN THIS INTO FULL EXTERNAL EXAMPLE__
-
-Suppose you want to share the same `HeroCacheService` among multiple components. One way to do this is to create a directive.
-
-```
-<ng-container heroCache>
-  <hero-overview></hero-overview>
-  <hero-details></hero-details>
-</ng-container>
-```
-
-Use the `@Directive()` decorator to configure the provider for the service:
-
-```
-@Directive(providers:[HeroCacheService])
-
-class heroCache{...}
-```
-
-Because the injectors for both the overview and details components are children of the injector created from the `heroCache` directive, they can inject things it provides.
-If the `heroCache` directive provides the `HeroCacheService`, the two components end up sharing them.
-
-If you want to show only one of them, use the directive to make sure __??of what??__.
-
-`<hero-overview heroCache></hero-overview>`
-
- --->

@@ -1,16 +1,17 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {ɵɵinject} from '../../di/injector_compatibility';
+import {forwardRef, resolveForwardRef} from '../../di/forward_ref';
+import {ɵɵinject, ɵɵinvalidFactoryDep} from '../../di/injector_compatibility';
 import {ɵɵdefineInjectable, ɵɵdefineInjector} from '../../di/interface/defs';
+import {registerNgModuleType} from '../../linker/ng_module_registration';
 import * as sanitization from '../../sanitization/sanitization';
 import * as r3 from '../index';
-
 
 
 /**
@@ -30,7 +31,6 @@ export const angularCoreEnv: {[name: string]: Function} =
        'ɵɵattributeInterpolate7': r3.ɵɵattributeInterpolate7,
        'ɵɵattributeInterpolate8': r3.ɵɵattributeInterpolate8,
        'ɵɵattributeInterpolateV': r3.ɵɵattributeInterpolateV,
-       'ɵɵdefineBase': r3.ɵɵdefineBase,
        'ɵɵdefineComponent': r3.ɵɵdefineComponent,
        'ɵɵdefineDirective': r3.ɵɵdefineDirective,
        'ɵɵdefineInjectable': ɵɵdefineInjectable,
@@ -38,25 +38,23 @@ export const angularCoreEnv: {[name: string]: Function} =
        'ɵɵdefineNgModule': r3.ɵɵdefineNgModule,
        'ɵɵdefinePipe': r3.ɵɵdefinePipe,
        'ɵɵdirectiveInject': r3.ɵɵdirectiveInject,
-       'ɵɵgetFactoryOf': r3.ɵɵgetFactoryOf,
        'ɵɵgetInheritedFactory': r3.ɵɵgetInheritedFactory,
        'ɵɵinject': ɵɵinject,
        'ɵɵinjectAttribute': r3.ɵɵinjectAttribute,
-       'ɵɵinjectPipeChangeDetectorRef': r3.ɵɵinjectPipeChangeDetectorRef,
+       'ɵɵinvalidFactory': r3.ɵɵinvalidFactory,
+       'ɵɵinvalidFactoryDep': ɵɵinvalidFactoryDep,
        'ɵɵtemplateRefExtractor': r3.ɵɵtemplateRefExtractor,
+       'ɵɵresetView': r3.ɵɵresetView,
        'ɵɵNgOnChangesFeature': r3.ɵɵNgOnChangesFeature,
        'ɵɵProvidersFeature': r3.ɵɵProvidersFeature,
+       'ɵɵCopyDefinitionFeature': r3.ɵɵCopyDefinitionFeature,
        'ɵɵInheritDefinitionFeature': r3.ɵɵInheritDefinitionFeature,
-       'ɵɵcontainer': r3.ɵɵcontainer,
        'ɵɵnextContext': r3.ɵɵnextContext,
-       'ɵɵcontainerRefreshStart': r3.ɵɵcontainerRefreshStart,
-       'ɵɵcontainerRefreshEnd': r3.ɵɵcontainerRefreshEnd,
        'ɵɵnamespaceHTML': r3.ɵɵnamespaceHTML,
        'ɵɵnamespaceMathML': r3.ɵɵnamespaceMathML,
        'ɵɵnamespaceSVG': r3.ɵɵnamespaceSVG,
        'ɵɵenableBindings': r3.ɵɵenableBindings,
        'ɵɵdisableBindings': r3.ɵɵdisableBindings,
-       'ɵɵallocHostVars': r3.ɵɵallocHostVars,
        'ɵɵelementStart': r3.ɵɵelementStart,
        'ɵɵelementEnd': r3.ɵɵelementEnd,
        'ɵɵelement': r3.ɵɵelement,
@@ -77,8 +75,8 @@ export const angularCoreEnv: {[name: string]: Function} =
        'ɵɵrestoreView': r3.ɵɵrestoreView,
        'ɵɵlistener': r3.ɵɵlistener,
        'ɵɵprojection': r3.ɵɵprojection,
-       'ɵɵupdateSyntheticHostBinding': r3.ɵɵupdateSyntheticHostBinding,
-       'ɵɵcomponentHostSyntheticListener': r3.ɵɵcomponentHostSyntheticListener,
+       'ɵɵsyntheticHostProperty': r3.ɵɵsyntheticHostProperty,
+       'ɵɵsyntheticHostListener': r3.ɵɵsyntheticHostListener,
        'ɵɵpipeBind1': r3.ɵɵpipeBind1,
        'ɵɵpipeBind2': r3.ɵɵpipeBind2,
        'ɵɵpipeBind3': r3.ɵɵpipeBind3,
@@ -100,12 +98,9 @@ export const angularCoreEnv: {[name: string]: Function} =
        'ɵɵpipe': r3.ɵɵpipe,
        'ɵɵqueryRefresh': r3.ɵɵqueryRefresh,
        'ɵɵviewQuery': r3.ɵɵviewQuery,
-       'ɵɵstaticViewQuery': r3.ɵɵstaticViewQuery,
-       'ɵɵstaticContentQuery': r3.ɵɵstaticContentQuery,
        'ɵɵloadQuery': r3.ɵɵloadQuery,
        'ɵɵcontentQuery': r3.ɵɵcontentQuery,
        'ɵɵreference': r3.ɵɵreference,
-       'ɵɵelementHostAttrs': r3.ɵɵelementHostAttrs,
        'ɵɵclassMap': r3.ɵɵclassMap,
        'ɵɵclassMapInterpolate1': r3.ɵɵclassMapInterpolate1,
        'ɵɵclassMapInterpolate2': r3.ɵɵclassMapInterpolate2,
@@ -117,6 +112,15 @@ export const angularCoreEnv: {[name: string]: Function} =
        'ɵɵclassMapInterpolate8': r3.ɵɵclassMapInterpolate8,
        'ɵɵclassMapInterpolateV': r3.ɵɵclassMapInterpolateV,
        'ɵɵstyleMap': r3.ɵɵstyleMap,
+       'ɵɵstyleMapInterpolate1': r3.ɵɵstyleMapInterpolate1,
+       'ɵɵstyleMapInterpolate2': r3.ɵɵstyleMapInterpolate2,
+       'ɵɵstyleMapInterpolate3': r3.ɵɵstyleMapInterpolate3,
+       'ɵɵstyleMapInterpolate4': r3.ɵɵstyleMapInterpolate4,
+       'ɵɵstyleMapInterpolate5': r3.ɵɵstyleMapInterpolate5,
+       'ɵɵstyleMapInterpolate6': r3.ɵɵstyleMapInterpolate6,
+       'ɵɵstyleMapInterpolate7': r3.ɵɵstyleMapInterpolate7,
+       'ɵɵstyleMapInterpolate8': r3.ɵɵstyleMapInterpolate8,
+       'ɵɵstyleMapInterpolateV': r3.ɵɵstyleMapInterpolateV,
        'ɵɵstyleProp': r3.ɵɵstyleProp,
        'ɵɵstylePropInterpolate1': r3.ɵɵstylePropInterpolate1,
        'ɵɵstylePropInterpolate2': r3.ɵɵstylePropInterpolate2,
@@ -127,9 +131,7 @@ export const angularCoreEnv: {[name: string]: Function} =
        'ɵɵstylePropInterpolate7': r3.ɵɵstylePropInterpolate7,
        'ɵɵstylePropInterpolate8': r3.ɵɵstylePropInterpolate8,
        'ɵɵstylePropInterpolateV': r3.ɵɵstylePropInterpolateV,
-       'ɵɵstyleSanitizer': r3.ɵɵstyleSanitizer,
        'ɵɵclassProp': r3.ɵɵclassProp,
-       'ɵɵselect': r3.ɵɵselect,
        'ɵɵadvance': r3.ɵɵadvance,
        'ɵɵtemplate': r3.ɵɵtemplate,
        'ɵɵtext': r3.ɵɵtext,
@@ -143,8 +145,6 @@ export const angularCoreEnv: {[name: string]: Function} =
        'ɵɵtextInterpolate7': r3.ɵɵtextInterpolate7,
        'ɵɵtextInterpolate8': r3.ɵɵtextInterpolate8,
        'ɵɵtextInterpolateV': r3.ɵɵtextInterpolateV,
-       'ɵɵembeddedViewStart': r3.ɵɵembeddedViewStart,
-       'ɵɵembeddedViewEnd': r3.ɵɵembeddedViewEnd,
        'ɵɵi18n': r3.ɵɵi18n,
        'ɵɵi18nAttributes': r3.ɵɵi18nAttributes,
        'ɵɵi18nExp': r3.ɵɵi18nExp,
@@ -157,12 +157,17 @@ export const angularCoreEnv: {[name: string]: Function} =
        'ɵɵresolveBody': r3.ɵɵresolveBody,
        'ɵɵsetComponentScope': r3.ɵɵsetComponentScope,
        'ɵɵsetNgModuleScope': r3.ɵɵsetNgModuleScope,
+       'ɵɵregisterNgModuleType': registerNgModuleType,
 
        'ɵɵsanitizeHtml': sanitization.ɵɵsanitizeHtml,
        'ɵɵsanitizeStyle': sanitization.ɵɵsanitizeStyle,
-       'ɵɵdefaultStyleSanitizer': sanitization.ɵɵdefaultStyleSanitizer,
        'ɵɵsanitizeResourceUrl': sanitization.ɵɵsanitizeResourceUrl,
        'ɵɵsanitizeScript': sanitization.ɵɵsanitizeScript,
        'ɵɵsanitizeUrl': sanitization.ɵɵsanitizeUrl,
        'ɵɵsanitizeUrlOrResourceUrl': sanitization.ɵɵsanitizeUrlOrResourceUrl,
+       'ɵɵtrustConstantHtml': sanitization.ɵɵtrustConstantHtml,
+       'ɵɵtrustConstantResourceUrl': sanitization.ɵɵtrustConstantResourceUrl,
+
+       'forwardRef': forwardRef,
+       'resolveForwardRef': resolveForwardRef,
      }))();

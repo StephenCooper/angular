@@ -3,7 +3,7 @@
 Note: this doc is for developing Angular, it is _not_ public
 documentation for building an Angular application with Bazel.
 
-The Bazel build tool (http://bazel.build) provides fast, reliable
+The Bazel build tool (https://bazel.build) provides fast, reliable
 incremental builds. We plan to migrate Angular's build scripts to
 Bazel.
 
@@ -13,7 +13,7 @@ In order to ensure that everyone builds Angular in a _consistent_ way, Bazel
 will be installed through NPM and therefore it's not necessary to install Bazel
 manually.
 
-The binaries for Bazel will be provided by the [`@bazel/bazel`](https://github.com/bazelbuild/rules_nodejs/tree/master/packages)
+The binaries for Bazel will be provided by the [`@bazel/bazelisk`](https://github.com/bazelbuild/bazelisk)
 NPM package and its platform-specific dependencies.
 
 You can access Bazel with the `yarn bazel` command
@@ -59,30 +59,26 @@ keeps the outputs up-to-date as you save sources.
 
 If you're experiencing problems with seemingly unrelated tests failing, it may be because you're not using the proper flags with your Bazel test runs in Angular.
 
-See also: [`//.bazelrc`](https://github.com/angular/angular/blob/master/.bazelrc) where `--define=compile=legacy` is defined as default.
-
 - `--config=debug`: build and launch in debug mode (see [debugging](#debugging) instructions below)
 - `--test_arg=--node_options=--inspect=9228`: change the inspector port.
-- `--define=compile=<option>` Controls if ivy or legacy mode is enabled. This switches which compiler is used (ngc, ngtsc, or a tsc pass-through mode).
-    - `legacy`: (default behavior) compile against View Engine, e.g. `--define=compile=legacy`
-    - `aot`: Compile in ivy AOT mode, e.g. `--define=compile=aot`
 - `--test_tag_filters=<tag>`: filter tests down to tags defined in the `tag` config of your rules in any given `BUILD.bazel`.
-    - `no-ivy-aot`: Useful for excluding build and test targets that are not meant to be executed in Ivy AOT mode (`--define=compile=aot`).
-    - `ivy-only`: Useful for excluding all Ivy build and tests targets with `--define=compile=legacy`.
-    - `fixme-ivy-aot`: Useful for including/excluding build and test targets that are currently broken in Ivy AOT mode (`--define=compile=aot`).
 
 
 ### Debugging a Node Test
 <a id="debugging"></a>
 
 - Open chrome at: [chrome://inspect](chrome://inspect)
-- Click on  `Open dedicated DevTools for Node` to launch a debugger.
+- Click on `Open dedicated DevTools for Node` to launch a debugger.
 - Run test: `yarn bazel test packages/core/test:test --config=debug`
 
-The process should automatically connect to the debugger. For additional info and testing options, see the [nodejs_test documentation](https://bazelbuild.github.io/rules_nodejs/node/node.html#nodejs_test).
+The process should automatically connect to the debugger.
+For more, see the [rules_nodejs Debugging documentation](https://bazelbuild.github.io/rules_nodejs/index.html#debugging).
+
+For additional info and testing options, see the
+[nodejs_test documentation](https://bazelbuild.github.io/rules_nodejs/Built-ins.html#nodejs_test).
 
 - Click on "Resume script execution" to let the code run until the first `debugger` statement or a previously set breakpoint.
-- If you're debugging an ivy test and you want to inspect the generated template instructions, find the template of your component in the call stack and click on `(source mapped from [CompName].js)` at the bottom of the code. You can also disable sourcemaps in the options or go to sources and look into ng:// namespace to see all the generated code.
+- If you're debugging a test and you want to inspect the generated template instructions, find the template of your component in the call stack and click on `(source mapped from [CompName].js)` at the bottom of the code. You can also disable sourcemaps in the options or go to sources and look into ng:// namespace to see all the generated code.
 
 ### Debugging a Node Test in VSCode
 
@@ -109,15 +105,15 @@ Apple+Shift+D on Mac) and click on the green play icon next to the configuration
 
 ### Debugging a Karma Test
 
-- Run test: `yarn bazel run packages/core/test:test_web`
-- Open chrome at: [http://localhost:9876/debug.html](http://localhost:9876/debug.html)
-- Open chrome inspector
+- Run test: `yarn bazel run packages/core/test:test_web_debug` (any `karma_web_test_suite` target has a `_debug` target)
+- Open any browser at: [http://localhost:9876/debug.html](http://localhost:9876/debug.html)
+- Open the browser's DevTools to debug the tests (after, for example, having focused on specific tests via `fit` and/or `fdescribe` or having added `debugger` statements in them)
 
 ### Debugging Bazel rules
 
 Open `external` directory which contains everything that bazel downloaded while executing the workspace file:
 ```sh
-open $(bazel info output_base)/external
+open $(yarn -s bazel info output_base)/external
 ```
 
 See subcommands that bazel executes (helpful for debugging):
@@ -127,7 +123,7 @@ yarn bazel build //packages/core:package -s
 
 To debug nodejs_binary executable paths uncomment `find . -name rollup 1>&2` (~ line 96) in
 ```sh
-open $(bazel info output_base)/external/build_bazel_rules_nodejs/internal/node_launcher.sh
+open $(yarn -s bazel info output_base)/external/build_bazel_rules_nodejs/internal/node_launcher.sh
 ```
 
 ## Stamping
@@ -200,13 +196,13 @@ yarn bazel analyze-profile filename_name.profile
 
 This will show the phase summary, individual phase information and critical path.
 
-You can also list all individual tasks and the time they took using `--task_tree`. 
+You can also list all individual tasks and the time they took using `--task_tree`.
 ```
 yarn bazel analyze-profile filename_name.profile --task_tree ".*"
 ```
 
 To show all tasks that take longer than a certain threshold, use the `--task_tree_threshold` flag.
-The default behaviour is to use a 50ms threshold.
+The default behavior is to use a 50ms threshold.
 ```
 yarn bazel analyze-profile filename_name.profile --task_tree ".*" --task_tree_threshold 5000
 ```
@@ -250,6 +246,49 @@ Usually there is a single item (or multiple items of the same kind) where the ov
 
 
 ## Known issues
+
+### Windows
+
+#### bazel run
+If you see the following error:
+
+```
+Error: Cannot find module 'C:\users\xxxx\_bazel_xxxx\7lxopdvs\execroot\angular\bazel-out\x64_windows-fastbuild\bin\packages\core\test\bundling\hello_world\symbol_test.bat.runfiles\angular\c;C:\msys64\users\xxxx\_bazel_xxxx\7lxopdvs\execroot\angular\bazel-out\x64_windows-fastbuild\bin\packages\core\test\bundling\hello_world\symbol_test.bat.runfiles\angular\packages\core\test\bundling\hello_world\symbol_test_require_patch.js'
+Require stack:
+- internal/preload
+    at Function.Module._resolveFilename (internal/modules/cjs/loader.js:793:17)
+    at Function.Module._load (internal/modules/cjs/loader.js:686:27)
+    at Module.require (internal/modules/cjs/loader.js:848:19)
+    at Module._preloadModules (internal/modules/cjs/loader.js:1133:12)
+    at loadPreloadModules (internal/bootstrap/pre_execution.js:443:5)
+    at prepareMainThreadExecution (internal/bootstrap/pre_execution.js:62:3)
+    at internal/main/run_main_module.js:7:1 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: [ 'internal/preload' ]
+```
+
+`bazel run` only works in Bazel Windows with non-test targets. Ensure that you are using `bazel test` instead.
+
+e.g: `yarn bazel test packages/core/test/bundling/forms:symbol_test`
+
+#### mkdir missing
+If you see the following error::
+```
+
+ERROR: An error occurred during the fetch of repository 'npm':
+   Traceback (most recent call last):
+        File "C:/users/anusername/_bazel_anusername/idexbm2i/external/build_bazel_rules_nodejs/internal/npm_install/npm_install.bzl", line 618, column 15, in _yarn_install_impl
+                _copy_file(repository_ctx, repository_ctx.attr.package_json)
+        File "C:/users/anusername/_bazel_anusername/idexbm2i/external/build_bazel_rules_nodejs/internal/npm_install/npm_install.bzl", line 345, column 17, in _copy_file
+                fail("mkdir -p %s failed: \nSTDOUT:\n%s\nSTDERR:\n%s" % (dirname, result.stdout, result.stderr))
+Error in fail: mkdir -p _ failed:
+
+```
+The `msys64` library and associated tools (like `mkdir`) are required to build Angular.
+
+Make sure you have `C:\msys64\usr\bin` in the "system" `PATH` rather than the "user" `PATH`.
+
+After that, a `git clean -xfd`, `yarn`, and `node scripts\build\build-packages-dist.js` should resolve this issue.
 
 ### Xcode
 

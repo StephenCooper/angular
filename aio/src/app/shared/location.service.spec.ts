@@ -1,34 +1,31 @@
-import { ReflectiveInjector } from '@angular/core';
+import { Injector } from '@angular/core';
 import { Location, LocationStrategy, PlatformLocation } from '@angular/common';
 import { MockLocationStrategy } from '@angular/common/testing';
-import { Subject } from 'rxjs';
 
 import { GaService } from 'app/shared/ga.service';
-import { SwUpdatesService } from 'app/sw-updates/sw-updates.service';
 import { LocationService } from './location.service';
 import { ScrollService } from './scroll.service';
 
 describe('LocationService', () => {
-  let injector: ReflectiveInjector;
+  let injector: Injector;
   let location: MockLocationStrategy;
   let service: LocationService;
-  let swUpdates: MockSwUpdatesService;
   let scrollService: MockScrollService;
 
   beforeEach(() => {
-    injector = ReflectiveInjector.resolveAndCreate([
-        LocationService,
-        Location,
-        { provide: GaService, useClass: TestGaService },
-        { provide: LocationStrategy, useClass: MockLocationStrategy },
-        { provide: PlatformLocation, useClass: MockPlatformLocation },
-        { provide: SwUpdatesService, useClass: MockSwUpdatesService },
-        { provide: ScrollService, useClass: MockScrollService }
-    ]);
+    injector = Injector.create({
+      providers: [
+        { provide: LocationService, deps: [GaService, Location, ScrollService, PlatformLocation] },
+        { provide: Location, deps: [LocationStrategy, PlatformLocation] },
+        { provide: GaService, useClass: TestGaService, deps: [] },
+        { provide: LocationStrategy, useClass: MockLocationStrategy, deps: [] },
+        { provide: PlatformLocation, useClass: MockPlatformLocation, deps: [] },
+        { provide: ScrollService, useClass: MockScrollService, deps: [] }
+      ]
+    });
 
-    location  = injector.get(LocationStrategy);
-    service  = injector.get(LocationService);
-    swUpdates  = injector.get(SwUpdatesService);
+    location = injector.get(LocationStrategy) as unknown as MockLocationStrategy;
+    service = injector.get(LocationService);
     scrollService = injector.get(ScrollService);
   });
 
@@ -242,7 +239,7 @@ describe('LocationService', () => {
     });
   });
 
-  describe('go', () => {
+  describe('go()', () => {
 
     it('should update the location', () => {
       service.go('some-new-url');
@@ -282,7 +279,7 @@ describe('LocationService', () => {
         service.currentUrl.subscribe(u => url = u);
 
         service.go('');
-        expect(url).toEqual(initialUrl, 'should not have re-navigated locally');
+        expect(url).withContext('should not have re-navigated locally').toEqual(initialUrl);
         expect(goExternalSpy).not.toHaveBeenCalled();
     });
 
@@ -293,39 +290,39 @@ describe('LocationService', () => {
       expect(goExternalSpy).toHaveBeenCalledWith(externalUrl);
     });
 
-    it('should do a "full page navigation" and remove the stored scroll position when navigating to ' +
-      'internal URLs only if a ServiceWorker update has been activated', () => {
+    it('should do a "full page navigation" if requested and remove the stored scroll position ' +
+        'when navigating to internal URLs only', () => {
       const goExternalSpy = spyOn(service, 'goExternal');
-      const removeStoredScrollPositionSpy = spyOn(scrollService, 'removeStoredScrollPosition');
+      const removeStoredScrollInfoSpy = spyOn(scrollService, 'removeStoredScrollInfo');
 
-      // Internal URL - No ServiceWorker update
+      // Internal URL - No full page navigation requested
       service.go('some-internal-url');
-      expect(removeStoredScrollPositionSpy).not.toHaveBeenCalled();
+      expect(removeStoredScrollInfoSpy).not.toHaveBeenCalled();
       expect(goExternalSpy).not.toHaveBeenCalled();
       expect(location.path(true)).toEqual('some-internal-url');
 
-      // Internal URL - ServiceWorker update
-      swUpdates.updateActivated.next('foo');
+      // Internal URL - Full page navigation requested
+      service.fullPageNavigationNeeded();
       service.go('other-internal-url');
       expect(goExternalSpy).toHaveBeenCalledWith('other-internal-url');
-      expect(removeStoredScrollPositionSpy).toHaveBeenCalled();
+      expect(removeStoredScrollInfoSpy).toHaveBeenCalled();
     });
 
     it('should not remove the stored scroll position when navigating to external URLs', () => {
-      const removeStoredScrollPositionSpy = spyOn(scrollService, 'removeStoredScrollPosition');
+      const removeStoredScrollInfoSpy = spyOn(scrollService, 'removeStoredScrollInfo');
       const goExternalSpy = spyOn(service, 'goExternal');
       const externalUrl = 'http://some/far/away/land';
       const otherExternalUrl = 'http://some/far/far/away/land';
 
-      // External URL - No ServiceWorker update
+      // External URL - No full page navigation requested
       service.go(externalUrl);
-      expect(removeStoredScrollPositionSpy).not.toHaveBeenCalled();
+      expect(removeStoredScrollInfoSpy).not.toHaveBeenCalled();
       expect(goExternalSpy).toHaveBeenCalledWith(externalUrl);
 
-      // External URL - ServiceWorker update
-      swUpdates.updateActivated.next('foo');
+      // External URL - Full page navigation requested
+      service.fullPageNavigationNeeded();
       service.go(otherExternalUrl);
-      expect(removeStoredScrollPositionSpy).not.toHaveBeenCalled();
+      expect(removeStoredScrollInfoSpy).not.toHaveBeenCalled();
       expect(goExternalSpy).toHaveBeenCalledWith(otherExternalUrl);
     });
 
@@ -334,12 +331,12 @@ describe('LocationService', () => {
       spyOn(service, 'goExternal');
       service.currentUrl.subscribe(url => localUrl = url);
       service.go('https://some/far/away/land');
-      expect(localUrl).toBeFalsy('should not set local url');
+      expect(localUrl).withContext('should not set local url').toBeFalsy();
     });
 
   });
 
-  describe('search', () => {
+  describe('search()', () => {
     it('should read the query from the current location.path', () => {
       location.simulatePopState('a/b/c?foo=bar&moo=car');
       expect(service.search()).toEqual({ foo: 'bar', moo: 'car' });
@@ -376,11 +373,11 @@ describe('LocationService', () => {
     });
   });
 
-  describe('setSearch', () => {
+  describe('setSearch()', () => {
     let platformLocation: MockPlatformLocation;
 
     beforeEach(() => {
-      platformLocation = injector.get(PlatformLocation);
+      platformLocation = injector.get(PlatformLocation) as unknown as MockPlatformLocation;
     });
 
     it('should call replaceState on PlatformLocation', () => {
@@ -392,7 +389,9 @@ describe('LocationService', () => {
     it('should convert the params to a query string', () => {
       const params = { foo: 'bar', moo: 'car' };
       service.setSearch('Some label', params);
-      expect(platformLocation.replaceState).toHaveBeenCalledWith(jasmine.any(Object), 'Some label', jasmine.any(String));
+      expect(platformLocation.replaceState).toHaveBeenCalledWith(
+        jasmine.any(Object),'Some label', jasmine.any(String)
+      );
       const [path, query] = platformLocation.replaceState.calls.mostRecent().args[2].split('?');
       expect(path).toEqual('a/b/c');
       expect(query).toContain('foo=bar');
@@ -414,7 +413,7 @@ describe('LocationService', () => {
     });
   });
 
-  describe('handleAnchorClick', () => {
+  describe('handleAnchorClick()', () => {
     let anchor: HTMLAnchorElement;
 
     beforeEach(() => {
@@ -434,6 +433,14 @@ describe('LocationService', () => {
         anchor.href = '/some/local/url';
         const result = service.handleAnchorClick(anchor);
         expect(service.go).toHaveBeenCalledWith('/some/local/url');
+        expect(result).toBe(false);
+      });
+
+      it('local fragment-only URL', () => {
+        location.internalPath = '/some/path';
+        anchor.href = '#some-fragment';
+        const result = service.handleAnchorClick(anchor);
+        expect(service.go).toHaveBeenCalledWith('/some/path#some-fragment');
         expect(result).toBe(false);
       });
 
@@ -540,27 +547,27 @@ describe('LocationService', () => {
         anchor.href = 'cat-photo.png';
         let result = service.handleAnchorClick(anchor);
         expect(service.go).not.toHaveBeenCalled();
-        expect(result).toBe(true, 'png');
+        expect(result).withContext('png').toBe(true);
 
         anchor.href = 'cat-photo.gif';
         result = service.handleAnchorClick(anchor);
         expect(service.go).not.toHaveBeenCalled();
-        expect(result).toBe(true, 'gif');
+        expect(result).withContext('gif').toBe(true);
 
         anchor.href = 'cat-photo.jpg';
         result = service.handleAnchorClick(anchor);
         expect(service.go).not.toHaveBeenCalled();
-        expect(result).toBe(true, 'jpg');
+        expect(result).withContext('jpg').toBe(true);
 
         anchor.href = 'dog-bark.mp3';
         result = service.handleAnchorClick(anchor);
         expect(service.go).not.toHaveBeenCalled();
-        expect(result).toBe(true, 'mp3');
+        expect(result).withContext('mp3').toBe(true);
 
         anchor.href = 'pet-tricks.mp4';
         result = service.handleAnchorClick(anchor);
         expect(service.go).not.toHaveBeenCalled();
-        expect(result).toBe(true, 'mp4');
+        expect(result).withContext('mp4').toBe(true);
       });
 
       it('url has any extension', () => {
@@ -577,7 +584,7 @@ describe('LocationService', () => {
     let gaLocationChanged: jasmine.Spy;
 
     beforeEach(() => {
-      const gaService = injector.get(GaService);
+      const gaService = injector.get(GaService) as unknown as TestGaService;
       gaLocationChanged = gaService.locationChanged;
       // execute currentPath observable so that gaLocationChanged is called
       service.currentPath.subscribe();
@@ -586,14 +593,14 @@ describe('LocationService', () => {
     it('should call locationChanged with initial URL', () => {
       const initialUrl = location.path().replace(/^\/+/, '');  // strip leading slashes
 
-      expect(gaLocationChanged.calls.count()).toBe(1, 'gaService.locationChanged');
+      expect(gaLocationChanged.calls.count()).withContext('gaService.locationChanged').toBe(1);
       const args = gaLocationChanged.calls.first().args;
       expect(args[0]).toBe(initialUrl);
     });
 
     it('should call locationChanged when `go` to a page', () => {
       service.go('some-new-url');
-      expect(gaLocationChanged.calls.count()).toBe(2, 'gaService.locationChanged');
+      expect(gaLocationChanged.calls.count()).withContext('gaService.locationChanged').toBe(2);
       const args = gaLocationChanged.calls.argsFor(1);
       expect(args[0]).toBe('some-new-url');
     });
@@ -604,16 +611,16 @@ describe('LocationService', () => {
       service.go('some-new-url#one');
       service.go('some-new-url#two');
       service.go('some-new-url/?foo="true"');
-      expect(gaLocationChanged.calls.count()).toBe(4, 'gaService.locationChanged called');
+      expect(gaLocationChanged.calls.count()).withContext('gaService.locationChanged called').toBe(4);
       const args = gaLocationChanged.calls.allArgs();
-      expect(args[1]).toEqual(args[2], 'same url for hash calls');
-      expect(args[1]).toEqual(args[3], 'same url for query string call');
+      expect(args[1]).withContext('same url for hash calls').toEqual(args[2]);
+      expect(args[1]).withContext('same url for query string call').toEqual(args[3]);
     });
 
     it('should call locationChanged when window history changes', () => {
       location.simulatePopState('/next-url');
 
-      expect(gaLocationChanged.calls.count()).toBe(2, 'gaService.locationChanged');
+      expect(gaLocationChanged.calls.count()).withContext('gaService.locationChanged').toBe(2);
       const args = gaLocationChanged.calls.argsFor(1);
       expect(args[0]).toBe('next-url');
     });
@@ -628,12 +635,8 @@ class MockPlatformLocation {
   replaceState = jasmine.createSpy('PlatformLocation.replaceState');
 }
 
-class MockSwUpdatesService {
-  updateActivated = new Subject<string>();
-}
-
 class MockScrollService {
-  removeStoredScrollPosition() { }
+  removeStoredScrollInfo() { }
 }
 
 class TestGaService {

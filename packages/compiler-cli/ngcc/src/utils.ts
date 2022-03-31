@@ -1,12 +1,14 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-import * as ts from 'typescript';
-import {AbsoluteFsPath, FileSystem, absoluteFrom} from '../../src/ngtsc/file_system';
+import ts from 'typescript';
+
+import {absoluteFrom, AbsoluteFsPath, isRooted, ReadonlyFileSystem} from '../../src/ngtsc/file_system';
+import {DeclarationNode, KnownDeclaration} from '../../src/ngtsc/reflection';
 
 /**
  * A list (`Array`) of partially ordered `T` items.
@@ -36,32 +38,12 @@ export function getOriginalSymbol(checker: ts.TypeChecker): (symbol: ts.Symbol) 
   };
 }
 
-export function isDefined<T>(value: T | undefined | null): value is T {
+export function isDefined<T>(value: T|undefined|null): value is T {
   return (value !== undefined) && (value !== null);
 }
 
-export function getNameText(name: ts.PropertyName | ts.BindingName): string {
+export function getNameText(name: ts.PropertyName|ts.BindingName): string {
   return ts.isIdentifier(name) || ts.isLiteralExpression(name) ? name.text : name.getText();
-}
-
-/**
- * Parse down the AST and capture all the nodes that satisfy the test.
- * @param node The start node.
- * @param test The function that tests whether a node should be included.
- * @returns a collection of nodes that satisfy the test.
- */
-export function findAll<T>(node: ts.Node, test: (node: ts.Node) => node is ts.Node & T): T[] {
-  const nodes: T[] = [];
-  findAllVisitor(node);
-  return nodes;
-
-  function findAllVisitor(n: ts.Node) {
-    if (test(n)) {
-      nodes.push(n);
-    } else {
-      n.forEachChild(child => findAllVisitor(child));
-    }
-  }
 }
 
 /**
@@ -69,24 +51,49 @@ export function findAll<T>(node: ts.Node, test: (node: ts.Node) => node is ts.No
  * @param declaration The declaration to test.
  * @returns true if the declaration has an identifier for a name.
  */
-export function hasNameIdentifier(declaration: ts.Declaration): declaration is ts.Declaration&
+export function hasNameIdentifier(declaration: ts.Node): declaration is DeclarationNode&
     {name: ts.Identifier} {
-  const namedDeclaration: ts.Declaration&{name?: ts.Node} = declaration;
+  const namedDeclaration: ts.Node&{name?: ts.Node} = declaration;
   return namedDeclaration.name !== undefined && ts.isIdentifier(namedDeclaration.name);
 }
-
-export type PathMappings = {
-  baseUrl: string,
-  paths: {[key: string]: string[]}
-};
 
 /**
  * Test whether a path is "relative".
  *
- * Relative paths start with `/`, `./` or `../`; or are simply `.` or `..`.
+ * Relative paths start with `/`, `./` or `../` (or the Windows equivalents); or are simply `.` or
+ * `..`.
  */
 export function isRelativePath(path: string): boolean {
-  return /^\/|^\.\.?($|\/)/.test(path);
+  return isRooted(path) || /^\.\.?(\/|\\|$)/.test(path);
+}
+
+/**
+ * A `Map`-like object that can compute and memoize a missing value for any key.
+ *
+ * The computed values are memoized, so the factory function is not called more than once per key.
+ * This is useful for storing values that are expensive to compute and may be used multiple times.
+ */
+// NOTE:
+// Ideally, this class should extend `Map`, but that causes errors in ES5 transpiled code:
+// `TypeError: Constructor Map requires 'new'`
+export class FactoryMap<K, V> {
+  private internalMap: Map<K, V>;
+
+  constructor(private factory: (key: K) => V, entries?: readonly(readonly[K, V])[]|null) {
+    this.internalMap = new Map(entries);
+  }
+
+  get(key: K): V {
+    if (!this.internalMap.has(key)) {
+      this.internalMap.set(key, this.factory(key));
+    }
+
+    return this.internalMap.get(key)!;
+  }
+
+  set(key: K, value: V): void {
+    this.internalMap.set(key, value);
+  }
 }
 
 /**
@@ -95,7 +102,7 @@ export function isRelativePath(path: string): boolean {
  * @returns An absolute path to the first matching existing file, or `null` if none exist.
  */
 export function resolveFileWithPostfixes(
-    fs: FileSystem, path: AbsoluteFsPath, postFixes: string[]): AbsoluteFsPath|null {
+    fs: ReadonlyFileSystem, path: AbsoluteFsPath, postFixes: string[]): AbsoluteFsPath|null {
   for (const postFix of postFixes) {
     const testPath = absoluteFrom(path + postFix);
     if (fs.exists(testPath) && fs.stat(testPath).isFile()) {
@@ -103,6 +110,44 @@ export function resolveFileWithPostfixes(
     }
   }
   return null;
+}
+
+/**
+ * Determine whether a function declaration corresponds with a TypeScript helper function, returning
+ * its kind if so or null if the declaration does not seem to correspond with such a helper.
+ */
+export function getTsHelperFnFromDeclaration(decl: DeclarationNode): KnownDeclaration|null {
+  if (!ts.isFunctionDeclaration(decl) && !ts.isVariableDeclaration(decl)) {
+    return null;
+  }
+
+  if (decl.name === undefined || !ts.isIdentifier(decl.name)) {
+    return null;
+  }
+
+  return getTsHelperFnFromIdentifier(decl.name);
+}
+
+/**
+ * Determine whether an identifier corresponds with a TypeScript helper function (based on its
+ * name), returning its kind if so or null if the identifier does not seem to correspond with such a
+ * helper.
+ */
+export function getTsHelperFnFromIdentifier(id: ts.Identifier): KnownDeclaration|null {
+  switch (stripDollarSuffix(id.text)) {
+    case '__assign':
+      return KnownDeclaration.TsHelperAssign;
+    case '__spread':
+      return KnownDeclaration.TsHelperSpread;
+    case '__spreadArrays':
+      return KnownDeclaration.TsHelperSpreadArrays;
+    case '__spreadArray':
+      return KnownDeclaration.TsHelperSpreadArray;
+    case '__read':
+      return KnownDeclaration.TsHelperRead;
+    default:
+      return null;
+  }
 }
 
 /**
@@ -114,4 +159,8 @@ export function resolveFileWithPostfixes(
  */
 export function stripDollarSuffix(value: string): string {
   return value.replace(/\$\d+$/, '');
+}
+
+export function stripExtension(fileName: string): string {
+  return fileName.replace(/\..+$/, '');
 }

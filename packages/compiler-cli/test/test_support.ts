@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
@@ -8,14 +8,14 @@
 /// <reference types="node" />
 import * as fs from 'fs';
 import * as path from 'path';
-import * as ts from 'typescript';
+import ts from 'typescript';
 
 import * as ng from '../index';
 import {NodeJSFileSystem, setFileSystem} from '../src/ngtsc/file_system';
-import {getAngularPackagesFromRunfiles, resolveNpmTreeArtifact} from '../test/helpers';
+import {getAngularPackagesFromRunfiles, resolveNpmTreeArtifact} from '../src/ngtsc/testing';
 
 // TEST_TMPDIR is always set by Bazel.
-const tmpdir = process.env.TEST_TMPDIR !;
+const tmpdir = process.env.TEST_TMPDIR!;
 
 export function makeTempDir(): string {
   let dir: string;
@@ -57,7 +57,6 @@ function createTestSupportFor(basePath: string) {
     'newLine': ts.NewLineKind.LineFeed,
     'module': ts.ModuleKind.ES2015,
     'moduleResolution': ts.ModuleResolutionKind.NodeJs,
-    'enableIvy': false,
     'lib': Object.freeze([
       path.resolve(basePath, 'node_modules/typescript/lib/lib.es6.d.ts'),
     ]) as string[],
@@ -97,8 +96,11 @@ function createTestSupportFor(basePath: string) {
   }
 
   function writeFiles(...mockDirs: {[fileName: string]: string}[]) {
-    mockDirs.forEach(
-        (dir) => { Object.keys(dir).forEach((fileName) => { write(fileName, dir[fileName]); }); });
+    mockDirs.forEach((dir) => {
+      Object.keys(dir).forEach((fileName) => {
+        write(fileName, dir[fileName]);
+      });
+    });
   }
 
   function createCompilerOptions(overrideOptions: ng.CompilerOptions = {}): ng.CompilerOptions {
@@ -140,7 +142,7 @@ export function setupBazelTo(tmpDirPath: string) {
     const rxjsSource = resolveNpmTreeArtifact('rxjs', 'index.js');
     const rxjsDest = path.join(nodeModulesPath, 'rxjs');
     fs.symlinkSync(rxjsSource, rxjsDest, 'junction');
-  } catch (e) {
+  } catch (e: any) {
     if (e.code !== 'MODULE_NOT_FOUND') throw e;
   }
 }
@@ -154,7 +156,7 @@ export function setup(): TestSupport {
   return createTestSupportFor(tmpDirPath);
 }
 
-export function expectNoDiagnostics(options: ng.CompilerOptions, diags: ng.Diagnostics) {
+export function expectNoDiagnostics(options: ng.CompilerOptions, diags: readonly ts.Diagnostic[]) {
   const errorDiags = diags.filter(d => d.category !== ts.DiagnosticCategory.Message);
   if (errorDiags.length) {
     throw new Error(`Expected no diagnostics: ${ng.formatDiagnostics(errorDiags)}`);
@@ -170,4 +172,10 @@ export function expectNoDiagnosticsInProgram(options: ng.CompilerOptions, p: ng.
 
 export function normalizeSeparators(path: string): string {
   return path.replace(/\\/g, '/');
+}
+
+const STRIP_ANSI = /\x1B\x5B\d+m/g;
+
+export function stripAnsi(diags: string): string {
+  return diags.replace(STRIP_ANSI, '');
 }

@@ -1,6 +1,6 @@
 # CLI Overview and Command Reference
 
-The Angular CLI is a command-line interface tool that you use to initialize, develop, scaffold, and maintain Angular applications. You can use the tool directly in a command shell, or indirectly through an interactive UI such as [Angular Console](https://angularconsole.com).
+The Angular CLI is a command-line interface tool that you use to initialize, develop, scaffold, and maintain Angular applications directly from a command shell.
 
 ## Installing Angular CLI
 
@@ -33,8 +33,8 @@ cd my-first-project
 ng serve
 </code-example>
 
-In your browser, open http://localhost:4200/ to see the new app run.
-When you use the [ng serve](cli/serve) command to build an app and serve it locally, the server automatically rebuilds the app and reloads the page when you change any of the source files.
+In your browser, open http://localhost:4200/ to see the new application run.
+When you use the [ng serve](cli/serve) command to build an application and serve it locally, the server automatically rebuilds the application and reloads the page when you change any of the source files.
 
 <div class="alert is-helpful">
 
@@ -46,17 +46,17 @@ When you use the [ng serve](cli/serve) command to build an app and serve it loca
 
 ## Workspaces and project files
 
-The [ng new](cli/new) command creates an *Angular workspace* folder and generates a new app skeleton.
-A workspace can contain multiple apps and libraries.
-The initial app created by the [ng new](cli/new) command is at the top level of the workspace.
-When you generate an additional app or library in a workspace, it goes into a `projects/` subfolder.
+The [ng new](cli/new) command creates an *Angular workspace* folder and generates a new application skeleton.
+A workspace can contain multiple applications and libraries.
+The initial application created by the [ng new](cli/new) command is at the top level of the workspace.
+When you generate an additional application or library in a workspace, it goes into a `projects/` subfolder.
 
-A newly generated app contains the source files for a root module, with a root component and template.
-Each app has a `src` folder that contains the logic, data, and assets.
+A newly generated application contains the source files for a root module, with a root component and template.
+Each application has a `src` folder that contains the logic, data, and assets.
 
 You can edit the generated files directly, or add to and modify them using CLI commands.
 Use the [ng generate](cli/generate) command to add new files for additional components and services, and code for new pipes, directives, and so on.
-Commands such as [add](cli/add) and [generate](cli/generate), which create or operate on apps and libraries, must be executed from within a workspace or project folder.
+Commands such as [add](cli/add) and [generate](cli/generate), which create or operate on applications and libraries, must be executed from within a workspace or project folder.
 
 * See more about the [Workspace file structure](guide/file-structure).
 
@@ -66,10 +66,9 @@ A single workspace configuration file, `angular.json`, is created at the top lev
 This is where you can set per-project defaults for CLI command options, and specify configurations to use when the CLI builds a project for different targets.
 
 The [ng config](cli/config) command lets you set and retrieve configuration values from the command line, or you can edit the `angular.json` file directly.
-Note that option names in the configuration file must use [camelCase](guide/glossary#case-types), while option names supplied to commands can use either camelCase or dash-case.
+Note that option names in the configuration file must use [camelCase](guide/glossary#case-types), while option names supplied to commands must be dash-case.
 
 * See more about [Workspace Configuration](guide/workspace-config).
-* See the [complete schema](https://github.com/angular/angular-cli/wiki/angular-workspace) for `angular.json`.
 
 ## CLI command-language syntax
 
@@ -93,12 +92,11 @@ Command syntax is shown as follows:
 [camelCase or dash-case](guide/glossary#case-types).
 `--myOptionName` is equivalent to `--my-option-name`.
 
-### Boolean and enumerated options
+### Boolean options
 
-Boolean options have two forms: `--thisOption` sets the flag, `--noThisOption` clears it.
+Boolean options have two forms: `--this-option` sets the flag to `true`, `--no-this-option` sets it to `false`.
 If neither option is supplied, the flag remains in its default state, as listed in the reference documentation.
 
-Allowed values are given with each enumerated option description, with the default value in **bold**.
 
 ### Relative paths
 
@@ -109,9 +107,3 @@ Options that specify files can be given as absolute paths, or as paths relative 
 The [ng generate](cli/generate) and  [ng add](cli/add) commands take as an argument the artifact or library to be generated or added to the current project.
 In addition to any general options, each artifact or library defines its own options in a *schematic*.
 Schematic options are supplied to the command in the same format as immediate command options.
-
-
-### Building with Bazel
-
-Optionally, you can configure the Angular CLI to use [Bazel](https://docs.bazel.build) as the build tool. For more information, see [Building with Bazel](guide/bazel).
-

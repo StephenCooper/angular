@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
@@ -9,10 +9,14 @@
 import {Injectable} from '@angular/core';
 
 import {AsyncValidatorFn, ValidatorFn} from './directives/validators';
-import {AbstractControl, AbstractControlOptions, FormArray, FormControl, FormGroup, FormHooks} from './model';
+import {ReactiveFormsModule} from './form_providers';
+import {AbstractControl, AbstractControlOptions, FormHooks} from './model/abstract_model';
+import {FormArray, isFormArray, UntypedFormArray} from './model/form_array';
+import {FormControl, FormControlOptions, isFormControl, UntypedFormControl} from './model/form_control';
+import {FormGroup, isFormGroup, UntypedFormGroup} from './model/form_group';
 
-function isAbstractControlOptions(options: AbstractControlOptions | {[key: string]: any}):
-    options is AbstractControlOptions {
+function isAbstractControlOptions(options: AbstractControlOptions|
+                                  {[key: string]: any}): options is AbstractControlOptions {
   return (<AbstractControlOptions>options).asyncValidators !== undefined ||
       (<AbstractControlOptions>options).validators !== undefined ||
       (<AbstractControlOptions>options).updateOn !== undefined;
@@ -30,7 +34,7 @@ function isAbstractControlOptions(options: AbstractControlOptions | {[key: strin
  *
  * @publicApi
  */
-@Injectable()
+@Injectable({providedIn: ReactiveFormsModule})
 export class FormBuilder {
   /**
    * @description
@@ -39,20 +43,44 @@ export class FormBuilder {
    * @param controlsConfig A collection of child controls. The key for each child is the name
    * under which it is registered.
    *
-   * @param options Configuration options object for the `FormGroup`. The object can
-   * have two shapes:
-   *
-   * 1) `AbstractControlOptions` object (preferred), which consists of:
+   * @param options Configuration options object for the `FormGroup`. The object should have the
+   * the `AbstractControlOptions` type and might contain the following fields:
    * * `validators`: A synchronous validator function, or an array of validator functions
    * * `asyncValidators`: A single async validator or array of async validator functions
    * * `updateOn`: The event upon which the control should be updated (options: 'change' | 'blur' |
    * submit')
+   */
+  group(
+      controlsConfig: {[key: string]: any},
+      options?: AbstractControlOptions|null,
+      ): FormGroup;
+  /**
+   * @description
+   * Construct a new `FormGroup` instance.
    *
-   * 2) Legacy configuration object, which consists of:
+   * @deprecated This API is not typesafe and can result in issues with Closure Compiler renaming.
+   * Use the `FormBuilder#group` overload with `AbstractControlOptions` instead.
+   * Note that `AbstractControlOptions` expects `validators` and `asyncValidators` to be valid
+   * validators. If you have custom validators, make sure their validation function parameter is
+   * `AbstractControl` and not a sub-class, such as `FormGroup`. These functions will be called with
+   * an object of type `AbstractControl` and that cannot be automatically downcast to a subclass, so
+   * TypeScript sees this as an error. For example, change the `(group: FormGroup) =>
+   * ValidationErrors|null` signature to be `(group: AbstractControl) => ValidationErrors|null`.
+   *
+   * @param controlsConfig A collection of child controls. The key for each child is the name
+   * under which it is registered.
+   *
+   * @param options Configuration options object for the `FormGroup`. The legacy configuration
+   * object consists of:
    * * `validator`: A synchronous validator function, or an array of validator functions
    * * `asyncValidator`: A single async validator or array of async validator functions
-   *
+   * Note: the legacy format is deprecated and might be removed in one of the next major versions
+   * of Angular.
    */
+  group(
+      controlsConfig: {[key: string]: any},
+      options: {[key: string]: any},
+      ): FormGroup;
   group(
       controlsConfig: {[key: string]: any},
       options: AbstractControlOptions|{[key: string]: any}|null = null): FormGroup {
@@ -102,7 +130,7 @@ export class FormBuilder {
    * </code-example>
    */
   control(
-      formState: any, validatorOrOpts?: ValidatorFn|ValidatorFn[]|AbstractControlOptions|null,
+      formState: any, validatorOrOpts?: ValidatorFn|ValidatorFn[]|FormControlOptions|null,
       asyncValidator?: AsyncValidatorFn|AsyncValidatorFn[]|null): FormControl {
     return new FormControl(formState, validatorOrOpts, asyncValidator);
   }
@@ -140,8 +168,7 @@ export class FormBuilder {
 
   /** @internal */
   _createControl(controlConfig: any): AbstractControl {
-    if (controlConfig instanceof FormControl || controlConfig instanceof FormGroup ||
-        controlConfig instanceof FormArray) {
+    if (isFormControl(controlConfig) || isFormGroup(controlConfig) || isFormArray(controlConfig)) {
       return controlConfig;
 
     } else if (Array.isArray(controlConfig)) {
@@ -153,5 +180,50 @@ export class FormBuilder {
     } else {
       return this.control(controlConfig);
     }
+  }
+}
+
+/**
+ * UntypedFormBuilder is the same as @see FormBuilder, but it provides untyped controls.
+ */
+@Injectable({providedIn: ReactiveFormsModule})
+export class UntypedFormBuilder extends FormBuilder {
+  /**
+   * @see FormBuilder#group
+   */
+  override group(
+      controlsConfig: {[key: string]: any},
+      options?: AbstractControlOptions|null,
+      ): UntypedFormGroup;
+  /**
+   * @deprecated
+   */
+  override group(
+      controlsConfig: {[key: string]: any},
+      options: {[key: string]: any},
+      ): UntypedFormGroup;
+  override group(
+      controlsConfig: {[key: string]: any},
+      options: AbstractControlOptions|{[key: string]: any}|null = null): UntypedFormGroup {
+    return super.group(controlsConfig, options);
+  }
+
+  /**
+   * @see FormBuilder#control
+   */
+  override control(
+      formState: any, validatorOrOpts?: ValidatorFn|ValidatorFn[]|FormControlOptions|null,
+      asyncValidator?: AsyncValidatorFn|AsyncValidatorFn[]|null): UntypedFormControl {
+    return super.control(formState, validatorOrOpts, asyncValidator);
+  }
+
+  /**
+   * @see FormBuilder#array
+   */
+  override array(
+      controlsConfig: any[],
+      validatorOrOpts?: ValidatorFn|ValidatorFn[]|AbstractControlOptions|null,
+      asyncValidator?: AsyncValidatorFn|AsyncValidatorFn[]|null): UntypedFormArray {
+    return super.array(controlsConfig, validatorOrOpts, asyncValidator);
   }
 }

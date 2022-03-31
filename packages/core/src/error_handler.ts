@@ -1,14 +1,12 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {getDebugContext, getErrorLogger, getOriginalError} from './errors';
-
-
+import {getErrorLogger, getOriginalError} from './util/errors';
 
 /**
  * Provides a hook for centralized exception handling.
@@ -43,7 +41,6 @@ export class ErrorHandler {
 
   handleError(error: any): void {
     const originalError = this._findOriginalError(error);
-    const context = this._findContext(error);
     // Note: Browser consoles show the place from where console.error was called.
     // We can use this to give users additional information about the error.
     const errorLogger = getErrorLogger(error);
@@ -52,28 +49,15 @@ export class ErrorHandler {
     if (originalError) {
       errorLogger(this._console, `ORIGINAL ERROR`, originalError);
     }
-    if (context) {
-      errorLogger(this._console, 'ERROR CONTEXT', context);
-    }
   }
 
   /** @internal */
-  _findContext(error: any): any {
-    if (error) {
-      return getDebugContext(error) ? getDebugContext(error) :
-                                      this._findContext(getOriginalError(error));
-    }
-
-    return null;
-  }
-
-  /** @internal */
-  _findOriginalError(error: Error): any {
-    let e = getOriginalError(error);
+  _findOriginalError(error: any): Error|null {
+    let e = error && getOriginalError(error);
     while (e && getOriginalError(e)) {
       e = getOriginalError(e);
     }
 
-    return e;
+    return e || null;
   }
 }

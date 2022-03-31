@@ -1,4 +1,4 @@
-load("//tools:defaults.bzl", "ng_package", "ts_library")
+load("//tools:defaults.bzl", "api_golden_test_npm_package", "ng_package", "ts_library")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -12,9 +12,8 @@ ts_library(
     ),
     module_name = "@angular/localize",
     deps = [
-        "//packages/compiler",
         "//packages/localize/src/localize",
-        "@npm//@types/node",
+        "//packages/localize/src/utils",
     ],
 )
 
@@ -24,9 +23,9 @@ ng_package(
         "package.json",
         "//packages/localize/init:package.json",
     ],
-    entry_point = ":index.ts",
-    packages = [
+    nested_packages = [
         "//packages/localize/schematics:npm_package",
+        "//packages/localize/tools:npm_package",
     ],
     tags = [
         "release-with-framework",
@@ -35,4 +34,17 @@ ng_package(
         ":localize",
         "//packages/localize/init",
     ],
+)
+
+api_golden_test_npm_package(
+    name = "localize_api",
+    data = [
+        ":npm_package",
+        "//goldens:public-api",
+    ],
+    golden_dir = "angular/goldens/public-api/localize",
+    npm_package = "angular/packages/localize/npm_package",
+    # The tool entry-point uses namespace aliases and API extractor needs to be
+    # able to resolve `@babel/core` to fully understand the `types` re-export/alias.
+    types = ["@npm//@types/babel__core"],
 )

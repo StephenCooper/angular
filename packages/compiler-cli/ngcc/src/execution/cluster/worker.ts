@@ -1,57 +1,68 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
-
 /// <reference types="node" />
 
-import * as cluster from 'cluster';
+import cluster from 'cluster';
 
-import {CompileFn, CreateCompileFn} from '../api';
+import {Logger} from '../../../../src/ngtsc/logging';
+import {CreateCompileFn} from '../api';
+import {stringifyTask} from '../tasks/utils';
 
 import {MessageToWorker} from './api';
 import {sendMessageToMaster} from './utils';
 
-
-/**
- * A cluster worker is responsible for processing one task (i.e. one format property for a specific
- * entry-point) at a time and reporting results back to the cluster master.
- */
-export class ClusterWorker {
-  private compile: CompileFn;
-
-  constructor(createCompileFn: CreateCompileFn) {
-    if (cluster.isMaster) {
-      throw new Error('Tried to instantiate `ClusterWorker` on the master process.');
-    }
-
-    this.compile =
-        createCompileFn((_task, outcome) => sendMessageToMaster({type: 'task-completed', outcome}));
+export async function startWorker(logger: Logger, createCompileFn: CreateCompileFn): Promise<void> {
+  if (cluster.isMaster) {
+    throw new Error('Tried to run cluster worker on the master process.');
   }
 
-  run(): Promise<void> {
-    // Listen for `ProcessTaskMessage`s and process tasks.
-    cluster.worker.on('message', (msg: MessageToWorker) => {
-      try {
-        switch (msg.type) {
-          case 'process-task':
-            return this.compile(msg.task);
-          default:
-            throw new Error(
-                `Invalid message received on worker #${cluster.worker.id}: ${JSON.stringify(msg)}`);
-        }
-      } catch (err) {
-        sendMessageToMaster({
-          type: 'error',
-          error: (err instanceof Error) ? (err.stack || err.message) : err,
-        });
+  const compile = createCompileFn(
+      transformedFiles => sendMessageToMaster({
+        type: 'transformed-files',
+        files: transformedFiles.map(f => f.path),
+      }),
+      (_task, outcome, message) => sendMessageToMaster({type: 'task-completed', outcome, message}));
+
+  // Listen for `ProcessTaskMessage`s and process tasks.
+  cluster.worker.on('message', async (msg: MessageToWorker) => {
+    try {
+      switch (msg.type) {
+        case 'process-task':
+          logger.debug(
+              `[Worker #${cluster.worker.id}] Processing task: ${stringifyTask(msg.task)}`);
+          return await compile(msg.task);
+        default:
+          throw new Error(
+              `[Worker #${cluster.worker.id}] Invalid message received: ${JSON.stringify(msg)}`);
       }
-    });
+    } catch (err: any) {
+      switch (err && err.code) {
+        case 'ENOMEM':
+          // Not being able to allocate enough memory is not necessarily a problem with processing
+          // the current task. It could just mean that there are too many tasks being processed
+          // simultaneously.
+          //
+          // Exit with an error and let the cluster master decide how to handle this.
+          logger.warn(`[Worker #${cluster.worker.id}] ${err.stack || err.message}`);
+          return process.exit(1);
+        default:
+          await sendMessageToMaster({
+            type: 'error',
+            error: (err instanceof Error) ? (err.stack || err.message) : err,
+          });
+      }
+    }
+  });
 
-    // Return a promise that is never resolved.
-    return new Promise(() => undefined);
-  }
+  // Notify the master that the worker is now ready and can receive messages.
+  await sendMessageToMaster({type: 'ready'});
+
+
+  // Return a promise that is never resolved.
+  return new Promise(() => undefined);
 }

@@ -1,6 +1,10 @@
 <h1>Animations</h1>
 
-Toggle All Animations <input type="checkbox" [checked]="!animationsDisabled" (click)="toggleAnimations()"/>
+<input type="checkbox"
+       id="animation-toggle"
+       [checked]="!animationsDisabled"
+       (click)="toggleAnimations()">
+<label for="animation-toggle">Toggle All Animations</label>
 
 <nav>
   <a id="home" routerLink="/home" routerLinkActive="active">Home</a>
@@ -12,10 +16,12 @@ Toggle All Animations <input type="checkbox" [checked]="!animationsDisabled" (cl
   <a id="auto" routerLink="/auto" routerLinkActive="active">Auto Calculation</a>
   <a id="heroes" routerLink="/heroes" routerLinkActive="active">Filter/Stagger</a>
   <a id="hero-groups" routerLink="/hero-groups" routerLinkActive="active">Hero Groups</a>
+  <a id="insert-remove" routerLink="/insert-remove" routerLinkActive="active">Insert/Remove</a>
+  <a id="querying" routerLink="/querying" routerLinkActive="active">Querying</a>
 </nav>
 
 <!-- #docregion route-animations-outlet -->
-<div [@routeAnimations]="prepareRoute(outlet)" >
-  <router-outlet #outlet="outlet"></router-outlet>
+<div [@routeAnimations]="getRouteAnimationData()">
+  <router-outlet></router-outlet>
 </div>
 <!-- #enddocregion route-animations-outlet -->

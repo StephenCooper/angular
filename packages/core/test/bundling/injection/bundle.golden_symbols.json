@@ -6,13 +6,10 @@
     "name": "EMPTY_ARRAY"
   },
   {
-    "name": "INJECTOR"
+    "name": "INJECTOR2"
   },
   {
     "name": "INJECTOR_SCOPE"
-  },
-  {
-    "name": "Inject"
   },
   {
     "name": "InjectFlags"
@@ -33,43 +30,25 @@
     "name": "NG_INJECTOR_DEF"
   },
   {
-    "name": "NG_TEMP_TOKEN_PATH"
+    "name": "NG_INJ_DEF"
   },
   {
-    "name": "NG_TOKEN_PATH"
+    "name": "NG_PROV_DEF"
   },
   {
     "name": "NOT_YET"
   },
   {
-    "name": "NO_NEW_LINE"
-  },
-  {
     "name": "NULL_INJECTOR"
-  },
-  {
-    "name": "NullInjector"
-  },
-  {
-    "name": "Optional"
-  },
-  {
-    "name": "PARAMETERS"
   },
   {
     "name": "R3Injector"
   },
   {
-    "name": "SOURCE"
+    "name": "RuntimeError"
   },
   {
     "name": "ScopedService"
-  },
-  {
-    "name": "Self"
-  },
-  {
-    "name": "SkipSelf"
   },
   {
     "name": "THROW_IF_NOT_FOUND"
@@ -81,28 +60,16 @@
     "name": "__forward_ref__"
   },
   {
-    "name": "__read"
-  },
-  {
-    "name": "__spread"
-  },
-  {
     "name": "_currentInjector"
   },
   {
-    "name": "catchInjectorError"
-  },
-  {
-    "name": "couldBeInjectableType"
+    "name": "_injectImplementation"
   },
   {
     "name": "createInjector"
   },
   {
     "name": "deepForEach"
-  },
-  {
-    "name": "formatError"
   },
   {
     "name": "forwardRef"
@@ -114,9 +81,6 @@
     "name": "getFactoryDef"
   },
   {
-    "name": "getInheritedInjectableDef"
-  },
-  {
     "name": "getInjectableDef"
   },
   {
@@ -126,13 +90,7 @@
     "name": "getNullInjector"
   },
   {
-    "name": "getUndecoratedInjectableFactory"
-  },
-  {
-    "name": "hasDeps"
-  },
-  {
-    "name": "hasOnDestroy"
+    "name": "getOwnDefinition"
   },
   {
     "name": "injectArgs"
@@ -147,37 +105,13 @@
     "name": "injectableDefOrInjectorDefFactory"
   },
   {
-    "name": "isExistingProvider"
-  },
-  {
-    "name": "isFactoryProvider"
-  },
-  {
-    "name": "isForwardRef"
-  },
-  {
     "name": "isTypeProvider"
   },
   {
     "name": "isValueProvider"
   },
   {
-    "name": "makeMetadataCtor"
-  },
-  {
-    "name": "makeParamDecorator"
-  },
-  {
     "name": "makeRecord"
-  },
-  {
-    "name": "newArray"
-  },
-  {
-    "name": "providerToFactory"
-  },
-  {
-    "name": "providerToRecord"
   },
   {
     "name": "resolveForwardRef"
@@ -186,22 +120,13 @@
     "name": "setCurrentInjector"
   },
   {
+    "name": "setInjectImplementation"
+  },
+  {
     "name": "stringify"
   },
   {
-    "name": "throwCyclicDependencyError"
-  },
-  {
-    "name": "throwInvalidProviderError"
-  },
-  {
-    "name": "throwMixedMultiProviderError"
-  },
-  {
     "name": "ɵɵdefineInjectable"
-  },
-  {
-    "name": "ɵɵdefineInjector"
   },
   {
     "name": "ɵɵinject"

@@ -1,21 +1,22 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {WrappedValue} from '../change_detection/change_detection_util';
 import {PipeTransform} from '../change_detection/pipe_transform';
+import {setInjectImplementation} from '../di/inject_switch';
+import {RuntimeError, RuntimeErrorCode} from '../errors';
 
-import {getFactoryDef} from './definition';
-import {store} from './instructions/all';
+import {getFactoryDef} from './definition_factory';
+import {setIncludeViewProviders} from './di';
+import {store, ɵɵdirectiveInject} from './instructions/all';
 import {PipeDef, PipeDefList} from './interfaces/definition';
-import {BINDING_INDEX, HEADER_OFFSET, LView, TVIEW} from './interfaces/view';
-import {ɵɵpureFunction1, ɵɵpureFunction2, ɵɵpureFunction3, ɵɵpureFunction4, ɵɵpureFunctionV} from './pure_function';
-import {getLView} from './state';
-import {NO_CHANGE} from './tokens';
+import {CONTEXT, DECLARATION_COMPONENT_VIEW, HEADER_OFFSET, LView, TVIEW} from './interfaces/view';
+import {pureFunction1Internal, pureFunction2Internal, pureFunction3Internal, pureFunction4Internal, pureFunctionVInternal} from './pure_function';
+import {getBindingRoot, getLView, getTView} from './state';
 import {load} from './util/view_utils';
 
 
@@ -30,12 +31,14 @@ import {load} from './util/view_utils';
  * @codeGenApi
  */
 export function ɵɵpipe(index: number, pipeName: string): any {
-  const tView = getLView()[TVIEW];
+  const tView = getTView();
   let pipeDef: PipeDef<any>;
   const adjustedIndex = index + HEADER_OFFSET;
 
-  if (tView.firstTemplatePass) {
-    pipeDef = getPipeDef(pipeName, tView.pipeRegistry);
+  if (tView.firstCreatePass) {
+    // The `getPipeDef` throws if a pipe with a given name is not found
+    // (so we use non-null assertion below).
+    pipeDef = getPipeDef(pipeName, tView.pipeRegistry)!;
     tView.data[adjustedIndex] = pipeDef;
     if (pipeDef.onDestroy) {
       (tView.destroyHooks || (tView.destroyHooks = [])).push(adjustedIndex, pipeDef.onDestroy);
@@ -45,9 +48,20 @@ export function ɵɵpipe(index: number, pipeName: string): any {
   }
 
   const pipeFactory = pipeDef.factory || (pipeDef.factory = getFactoryDef(pipeDef.type, true));
-  const pipeInstance = pipeFactory();
-  store(index, pipeInstance);
-  return pipeInstance;
+  const previousInjectImplementation = setInjectImplementation(ɵɵdirectiveInject);
+  try {
+    // DI for pipes is supposed to behave like directives when placed on a component
+    // host node, which means that we have to disable access to `viewProviders`.
+    const previousIncludeViewProviders = setIncludeViewProviders(false);
+    const pipeInstance = pipeFactory();
+    setIncludeViewProviders(previousIncludeViewProviders);
+    store(tView, getLView(), adjustedIndex, pipeInstance);
+    return pipeInstance;
+  } finally {
+    // we have to restore the injector implementation in finally, just in case the creation of the
+    // pipe throws an error.
+    setInjectImplementation(previousInjectImplementation);
+  }
 }
 
 /**
@@ -57,10 +71,8 @@ export function ɵɵpipe(index: number, pipeName: string): any {
  * @param name Name of pipe to resolve
  * @param registry Full list of available pipes
  * @returns Matching PipeDef
- *
- * @publicApi
  */
-function getPipeDef(name: string, registry: PipeDefList | null): PipeDef<any> {
+function getPipeDef(name: string, registry: PipeDefList|null): PipeDef<any>|undefined {
   if (registry) {
     for (let i = registry.length - 1; i >= 0; i--) {
       const pipeDef = registry[i];
@@ -69,7 +81,14 @@ function getPipeDef(name: string, registry: PipeDefList | null): PipeDef<any> {
       }
     }
   }
-  throw new Error(`The pipe '${name}' could not be found!`);
+  if (ngDevMode) {
+    const lView = getLView();
+    const declarationLView = lView[DECLARATION_COMPONENT_VIEW];
+    const context = declarationLView[CONTEXT];
+    const component = context ? ` in the '${context.constructor.name}' component` : '';
+    throw new RuntimeError(
+        RuntimeErrorCode.PIPE_NOT_FOUND, `The pipe '${name}' could not be found${component}!`);
+  }
 }
 
 /**
@@ -85,12 +104,13 @@ function getPipeDef(name: string, registry: PipeDefList | null): PipeDef<any> {
  * @codeGenApi
  */
 export function ɵɵpipeBind1(index: number, slotOffset: number, v1: any): any {
+  const adjustedIndex = index + HEADER_OFFSET;
   const lView = getLView();
-  const pipeInstance = load<PipeTransform>(lView, index);
-  return unwrapValue(
-      lView, isPure(lView, index) ?
-          ɵɵpureFunction1(slotOffset, pipeInstance.transform, v1, pipeInstance) :
-          pipeInstance.transform(v1));
+  const pipeInstance = load<PipeTransform>(lView, adjustedIndex);
+  return isPure(lView, adjustedIndex) ?
+      pureFunction1Internal(
+          lView, getBindingRoot(), slotOffset, pipeInstance.transform, v1, pipeInstance) :
+      pipeInstance.transform(v1);
 }
 
 /**
@@ -107,12 +127,13 @@ export function ɵɵpipeBind1(index: number, slotOffset: number, v1: any): any {
  * @codeGenApi
  */
 export function ɵɵpipeBind2(index: number, slotOffset: number, v1: any, v2: any): any {
+  const adjustedIndex = index + HEADER_OFFSET;
   const lView = getLView();
-  const pipeInstance = load<PipeTransform>(lView, index);
-  return unwrapValue(
-      lView, isPure(lView, index) ?
-          ɵɵpureFunction2(slotOffset, pipeInstance.transform, v1, v2, pipeInstance) :
-          pipeInstance.transform(v1, v2));
+  const pipeInstance = load<PipeTransform>(lView, adjustedIndex);
+  return isPure(lView, adjustedIndex) ?
+      pureFunction2Internal(
+          lView, getBindingRoot(), slotOffset, pipeInstance.transform, v1, v2, pipeInstance) :
+      pipeInstance.transform(v1, v2);
 }
 
 /**
@@ -130,12 +151,13 @@ export function ɵɵpipeBind2(index: number, slotOffset: number, v1: any, v2: an
  * @codeGenApi
  */
 export function ɵɵpipeBind3(index: number, slotOffset: number, v1: any, v2: any, v3: any): any {
+  const adjustedIndex = index + HEADER_OFFSET;
   const lView = getLView();
-  const pipeInstance = load<PipeTransform>(lView, index);
-  return unwrapValue(
-      lView, isPure(lView, index) ?
-          ɵɵpureFunction3(slotOffset, pipeInstance.transform, v1, v2, v3, pipeInstance) :
-          pipeInstance.transform(v1, v2, v3));
+  const pipeInstance = load<PipeTransform>(lView, adjustedIndex);
+  return isPure(lView, adjustedIndex) ?
+      pureFunction3Internal(
+          lView, getBindingRoot(), slotOffset, pipeInstance.transform, v1, v2, v3, pipeInstance) :
+      pipeInstance.transform(v1, v2, v3);
 }
 
 /**
@@ -155,12 +177,13 @@ export function ɵɵpipeBind3(index: number, slotOffset: number, v1: any, v2: an
  */
 export function ɵɵpipeBind4(
     index: number, slotOffset: number, v1: any, v2: any, v3: any, v4: any): any {
+  const adjustedIndex = index + HEADER_OFFSET;
   const lView = getLView();
-  const pipeInstance = load<PipeTransform>(lView, index);
-  return unwrapValue(
-      lView, isPure(lView, index) ?
-          ɵɵpureFunction4(slotOffset, pipeInstance.transform, v1, v2, v3, v4, pipeInstance) :
-          pipeInstance.transform(v1, v2, v3, v4));
+  const pipeInstance = load<PipeTransform>(lView, adjustedIndex);
+  return isPure(lView, adjustedIndex) ? pureFunction4Internal(
+                                            lView, getBindingRoot(), slotOffset,
+                                            pipeInstance.transform, v1, v2, v3, v4, pipeInstance) :
+                                        pipeInstance.transform(v1, v2, v3, v4);
 }
 
 /**
@@ -176,32 +199,15 @@ export function ɵɵpipeBind4(
  * @codeGenApi
  */
 export function ɵɵpipeBindV(index: number, slotOffset: number, values: [any, ...any[]]): any {
+  const adjustedIndex = index + HEADER_OFFSET;
   const lView = getLView();
-  const pipeInstance = load<PipeTransform>(lView, index);
-  return unwrapValue(
-      lView, isPure(lView, index) ?
-          ɵɵpureFunctionV(slotOffset, pipeInstance.transform, values, pipeInstance) :
-          pipeInstance.transform.apply(pipeInstance, values));
+  const pipeInstance = load<PipeTransform>(lView, adjustedIndex);
+  return isPure(lView, adjustedIndex) ?
+      pureFunctionVInternal(
+          lView, getBindingRoot(), slotOffset, pipeInstance.transform, values, pipeInstance) :
+      pipeInstance.transform.apply(pipeInstance, values);
 }
 
 function isPure(lView: LView, index: number): boolean {
-  return (<PipeDef<any>>lView[TVIEW].data[index + HEADER_OFFSET]).pure;
-}
-
-/**
- * Unwrap the output of a pipe transformation.
- * In order to trick change detection into considering that the new value is always different from
- * the old one, the old value is overwritten by NO_CHANGE.
- *
- * @param newValue the pipe transformation output.
- */
-function unwrapValue(lView: LView, newValue: any): any {
-  if (WrappedValue.isWrapped(newValue)) {
-    newValue = WrappedValue.unwrap(newValue);
-    // The NO_CHANGE value needs to be written at the index where the impacted binding value is
-    // stored
-    const bindingToInvalidateIdx = lView[BINDING_INDEX];
-    lView[bindingToInvalidateIdx] = NO_CHANGE;
-  }
-  return newValue;
+  return (<PipeDef<any>>lView[TVIEW].data[index]).pure;
 }

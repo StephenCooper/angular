@@ -1,17 +1,17 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 import {bindingUpdated} from '../bindings';
 import {SanitizerFn} from '../interfaces/sanitization';
-import {BINDING_INDEX, TVIEW} from '../interfaces/view';
-import {getLView, getSelectedIndex} from '../state';
+import {RENDERER} from '../interfaces/view';
+import {getCurrentDirectiveDef, getLView, getSelectedTNode, getTView, nextBindingIndex} from '../state';
 import {NO_CHANGE} from '../tokens';
 
-import {TsickleIssue1009, elementPropertyInternal, loadComponentRenderer, storePropertyBindingMetadata} from './shared';
+import {elementPropertyInternal, loadComponentRenderer, storePropertyBindingMetadata} from './shared';
 
 /**
  * Update a property on a host element. Only applies to native node properties, not inputs.
@@ -28,20 +28,21 @@ import {TsickleIssue1009, elementPropertyInternal, loadComponentRenderer, storeP
  * @codeGenApi
  */
 export function ɵɵhostProperty<T>(
-    propName: string, value: T, sanitizer?: SanitizerFn | null): TsickleIssue1009 {
+    propName: string, value: T, sanitizer?: SanitizerFn|null): typeof ɵɵhostProperty {
   const lView = getLView();
-  const bindingIndex = lView[BINDING_INDEX]++;
+  const bindingIndex = nextBindingIndex();
   if (bindingUpdated(lView, bindingIndex, value)) {
-    const nodeIndex = getSelectedIndex();
-    elementPropertyInternal(lView, nodeIndex, propName, value, sanitizer, true);
-    ngDevMode && storePropertyBindingMetadata(lView[TVIEW].data, nodeIndex, propName, bindingIndex);
+    const tView = getTView();
+    const tNode = getSelectedTNode();
+    elementPropertyInternal(tView, tNode, lView, propName, value, lView[RENDERER], sanitizer, true);
+    ngDevMode && storePropertyBindingMetadata(tView.data, tNode, propName, bindingIndex);
   }
   return ɵɵhostProperty;
 }
 
 
 /**
- * Updates a synthetic host binding (e.g. `[@foo]`) on a component.
+ * Updates a synthetic host binding (e.g. `[@foo]`) on a component or directive.
  *
  * This instruction is for compatibility purposes and is designed to ensure that a
  * synthetic host binding (e.g. `@HostBinding('@foo')`) properly gets rendered in
@@ -61,15 +62,18 @@ export function ɵɵhostProperty<T>(
  *
  * @codeGenApi
  */
-export function ɵɵupdateSyntheticHostBinding<T>(
-    propName: string, value: T | NO_CHANGE, sanitizer?: SanitizerFn | null): TsickleIssue1009 {
+export function ɵɵsyntheticHostProperty<T>(
+    propName: string, value: T|NO_CHANGE,
+    sanitizer?: SanitizerFn|null): typeof ɵɵsyntheticHostProperty {
   const lView = getLView();
-  const bindingIndex = lView[BINDING_INDEX]++;
+  const bindingIndex = nextBindingIndex();
   if (bindingUpdated(lView, bindingIndex, value)) {
-    const nodeIndex = getSelectedIndex();
-    elementPropertyInternal(
-        lView, nodeIndex, propName, value, sanitizer, true, loadComponentRenderer);
-    ngDevMode && storePropertyBindingMetadata(lView[TVIEW].data, nodeIndex, propName, bindingIndex);
+    const tView = getTView();
+    const tNode = getSelectedTNode();
+    const currentDef = getCurrentDirectiveDef(tView.data);
+    const renderer = loadComponentRenderer(currentDef, tNode, lView);
+    elementPropertyInternal(tView, tNode, lView, propName, value, renderer, sanitizer, true);
+    ngDevMode && storePropertyBindingMetadata(tView.data, tNode, propName, bindingIndex);
   }
-  return ɵɵupdateSyntheticHostBinding;
+  return ɵɵsyntheticHostProperty;
 }

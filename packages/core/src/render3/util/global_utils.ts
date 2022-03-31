@@ -1,13 +1,15 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 import {assertDefined} from '../../util/assert';
 import {global} from '../../util/global';
-import {getComponent, getContext, getDebugNode, getDirectives, getHostElement, getInjector, getListeners, getRootComponents, getViewComponent, markDirty} from '../global_utils_api';
+import {setProfiler} from '../profiler';
+import {applyChanges} from './change_detection_utils';
+import {getComponent, getContext, getDirectiveMetadata, getDirectives, getHostElement, getInjector, getListeners, getOwningComponent, getRootComponents} from './discovery_utils';
 
 
 
@@ -17,8 +19,7 @@ import {getComponent, getContext, getDebugNode, getDirectives, getHostElement, g
  *
  * To see this in action run the following command:
  *
- *   bazel run --define=compile=aot
- *   //packages/core/test/bundling/todo:devserver
+ *   bazel run //packages/core/test/bundling/todo:devserver
  *
  *  Then load `localhost:5432` and start using the console tools.
  */
@@ -39,16 +40,23 @@ let _published = false;
 export function publishDefaultGlobalUtils() {
   if (!_published) {
     _published = true;
+
+    /**
+     * Warning: this function is *INTERNAL* and should not be relied upon in application's code.
+     * The contract of the function might be changed in any release and/or the function can be
+     * removed completely.
+     */
+    publishGlobalUtil('ɵsetProfiler', setProfiler);
+    publishGlobalUtil('getDirectiveMetadata', getDirectiveMetadata);
     publishGlobalUtil('getComponent', getComponent);
     publishGlobalUtil('getContext', getContext);
     publishGlobalUtil('getListeners', getListeners);
-    publishGlobalUtil('getViewComponent', getViewComponent);
+    publishGlobalUtil('getOwningComponent', getOwningComponent);
     publishGlobalUtil('getHostElement', getHostElement);
     publishGlobalUtil('getInjector', getInjector);
     publishGlobalUtil('getRootComponents', getRootComponents);
     publishGlobalUtil('getDirectives', getDirectives);
-    publishGlobalUtil('getDebugNode', getDebugNode);
-    publishGlobalUtil('markDirty', markDirty);
+    publishGlobalUtil('applyChanges', applyChanges);
   }
 }
 

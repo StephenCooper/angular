@@ -1,40 +1,35 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 
+import '../util/ng_dev_mode';
+
+import {RuntimeError, RuntimeErrorCode} from '../errors';
 import {Type} from '../interface/type';
 import {getClosureSafeProperty} from '../util/property';
 import {stringify} from '../util/stringify';
 
 import {resolveForwardRef} from './forward_ref';
-import {InjectionToken} from './injection_token';
+import {getInjectImplementation, injectRootLimpMode} from './inject_switch';
 import {Injector} from './injector';
-import {getInjectableDef, ɵɵInjectableDef} from './interface/defs';
-import {InjectFlags} from './interface/injector';
+import {DecoratorFlags, InjectFlags, InternalInjectFlags} from './interface/injector';
 import {ValueProvider} from './interface/provider';
-import {Inject, Optional, Self, SkipSelf} from './metadata';
+import {ProviderToken} from './provider_token';
 
 
-
-/**
- * An InjectionToken that gets the current `Injector` for `createInjector()`-style injectors.
- *
- * Requesting this token instead of `Injector` allows `StaticInjector` to be tree-shaken from a
- * project.
- *
- * @publicApi
- */
-export const INJECTOR = new InjectionToken<Injector>(
-    'INJECTOR',
-    -1 as any  // `-1` is used by Ivy DI system as special value to recognize it as `Injector`.
-    );
-
-const _THROW_IF_NOT_FOUND = new Object();
+const _THROW_IF_NOT_FOUND = {};
 export const THROW_IF_NOT_FOUND = _THROW_IF_NOT_FOUND;
+
+/*
+ * Name of a property (that we patch onto DI decorator), which is used as an annotation of which
+ * InjectFlag this decorator represents. This allows to avoid direct references to the DI decorators
+ * in the code, thus making them tree-shakable.
+ */
+const DI_DECORATOR_FLAG = '__NG_DI_FLAG__';
 
 export const NG_TEMP_TOKEN_PATH = 'ngTempTokenPath';
 const NG_TOKEN_PATH = 'ngTokenPath';
@@ -53,42 +48,21 @@ export const USE_VALUE =
  */
 let _currentInjector: Injector|undefined|null = undefined;
 
-export function setCurrentInjector(injector: Injector | null | undefined): Injector|undefined|null {
+export function setCurrentInjector(injector: Injector|null|undefined): Injector|undefined|null {
   const former = _currentInjector;
   _currentInjector = injector;
   return former;
 }
 
-/**
- * Current implementation of inject.
- *
- * By default, it is `injectInjectorOnly`, which makes it `Injector`-only aware. It can be changed
- * to `directiveInject`, which brings in the `NodeInjector` system of ivy. It is designed this
- * way for two reasons:
- *  1. `Injector` should not depend on ivy logic.
- *  2. To maintain tree shake-ability we don't want to bring in unnecessary code.
- */
-let _injectImplementation:
-    (<T>(token: Type<T>| InjectionToken<T>, flags?: InjectFlags) => T | null)|undefined;
-
-/**
- * Sets the current inject implementation.
- */
-export function setInjectImplementation(
-    impl: (<T>(token: Type<T>| InjectionToken<T>, flags?: InjectFlags) => T | null) | undefined):
-    (<T>(token: Type<T>| InjectionToken<T>, flags?: InjectFlags) => T | null)|undefined {
-  const previous = _injectImplementation;
-  _injectImplementation = impl;
-  return previous;
-}
-
-export function injectInjectorOnly<T>(token: Type<T>| InjectionToken<T>): T;
-export function injectInjectorOnly<T>(token: Type<T>| InjectionToken<T>, flags?: InjectFlags): T|
-    null;
-export function injectInjectorOnly<T>(
-    token: Type<T>| InjectionToken<T>, flags = InjectFlags.Default): T|null {
+export function injectInjectorOnly<T>(token: ProviderToken<T>): T;
+export function injectInjectorOnly<T>(token: ProviderToken<T>, flags?: InjectFlags): T|null;
+export function injectInjectorOnly<T>(token: ProviderToken<T>, flags = InjectFlags.Default): T|
+    null {
   if (_currentInjector === undefined) {
-    throw new Error(`inject() must be called from an injection context`);
+    const errorMessage = (typeof ngDevMode === 'undefined' || ngDevMode) ?
+        `inject() must be called from an injection context` :
+        '';
+    throw new RuntimeError(RuntimeErrorCode.MISSING_INJECTION_CONTEXT, errorMessage);
   } else if (_currentInjector === null) {
     return injectRootLimpMode(token, undefined, flags);
   } else {
@@ -102,16 +76,41 @@ export function injectInjectorOnly<T>(
  * Must be used in the context of a factory function such as one defined for an
  * `InjectionToken`. Throws an error if not called from such a context.
  *
- * (Additional documentation moved to `inject`, as it is the public API, and an alias for this instruction)
+ * (Additional documentation moved to `inject`, as it is the public API, and an alias for this
+ * instruction)
  *
  * @see inject
  * @codeGenApi
+ * @publicApi This instruction has been emitted by ViewEngine for some time and is deployed to npm.
  */
-export function ɵɵinject<T>(token: Type<T>| InjectionToken<T>): T;
-export function ɵɵinject<T>(token: Type<T>| InjectionToken<T>, flags?: InjectFlags): T|null;
-export function ɵɵinject<T>(token: Type<T>| InjectionToken<T>, flags = InjectFlags.Default): T|
-    null {
-  return (_injectImplementation || injectInjectorOnly)(resolveForwardRef(token), flags);
+export function ɵɵinject<T>(token: ProviderToken<T>): T;
+export function ɵɵinject<T>(token: ProviderToken<T>, flags?: InjectFlags): T|null;
+export function ɵɵinject<T>(token: ProviderToken<T>, flags = InjectFlags.Default): T|null {
+  return (getInjectImplementation() || injectInjectorOnly)(resolveForwardRef(token), flags);
+}
+
+/**
+ * Throws an error indicating that a factory function could not be generated by the compiler for a
+ * particular class.
+ *
+ * This instruction allows the actual error message to be optimized away when ngDevMode is turned
+ * off, saving bytes of generated code while still providing a good experience in dev mode.
+ *
+ * The name of the class is not mentioned here, but will be in the generated factory function name
+ * and thus in the stack trace.
+ *
+ * @codeGenApi
+ */
+export function ɵɵinvalidFactoryDep(index: number): never {
+  const msg = ngDevMode ?
+      `This constructor is not compatible with Angular Dependency Injection because its dependency at index ${
+          index} of the parameter list is invalid.
+This can happen if the dependency type is a primitive like a string or if an ancestor of this class is missing an Angular decorator.
+
+Please check that 1) the type for the parameter at index ${
+          index} is correct and 2) the correct Angular decorators are defined for this class and its ancestors.` :
+      'invalid';
+  throw new Error(msg);
 }
 
 /**
@@ -128,7 +127,7 @@ export function ɵɵinject<T>(token: Type<T>| InjectionToken<T>, flags = InjectF
  * @param flags Optional flags that control how injection is executed.
  * The flags correspond to injection strategies that can be specified with
  * parameter decorators `@Host`, `@Self`, `@SkipSef`, and `@Optional`.
- * @returns True if injection is successful, null otherwise.
+ * @returns the injected value if injection is successful, `null` otherwise.
  *
  * @usageNotes
  *
@@ -140,53 +139,36 @@ export function ɵɵinject<T>(token: Type<T>| InjectionToken<T>, flags = InjectF
  */
 export const inject = ɵɵinject;
 
-/**
- * Injects `root` tokens in limp mode.
- *
- * If no injector exists, we can still inject tree-shakable providers which have `providedIn` set to
- * `"root"`. This is known as the limp mode injection. In such case the value is stored in the
- * `InjectableDef`.
- */
-export function injectRootLimpMode<T>(
-    token: Type<T>| InjectionToken<T>, notFoundValue: T | undefined, flags: InjectFlags): T|null {
-  const injectableDef: ɵɵInjectableDef<T>|null = getInjectableDef(token);
-  if (injectableDef && injectableDef.providedIn == 'root') {
-    return injectableDef.value === undefined ? injectableDef.value = injectableDef.factory() :
-                                               injectableDef.value;
-  }
-  if (flags & InjectFlags.Optional) return null;
-  if (notFoundValue !== undefined) return notFoundValue;
-  throw new Error(`Injector: NOT_FOUND [${stringify(token)}]`);
-}
-
-export function injectArgs(types: (Type<any>| InjectionToken<any>| any[])[]): any[] {
+export function injectArgs(types: (ProviderToken<any>|any[])[]): any[] {
   const args: any[] = [];
   for (let i = 0; i < types.length; i++) {
     const arg = resolveForwardRef(types[i]);
     if (Array.isArray(arg)) {
       if (arg.length === 0) {
-        throw new Error('Arguments array must have arguments.');
+        const errorMessage = (typeof ngDevMode === 'undefined' || ngDevMode) ?
+            'Arguments array must have arguments.' :
+            '';
+        throw new RuntimeError(RuntimeErrorCode.INVALID_DIFFER_INPUT, errorMessage);
       }
       let type: Type<any>|undefined = undefined;
       let flags: InjectFlags = InjectFlags.Default;
 
       for (let j = 0; j < arg.length; j++) {
         const meta = arg[j];
-        if (meta instanceof Optional || meta.ngMetadataName === 'Optional' || meta === Optional) {
-          flags |= InjectFlags.Optional;
-        } else if (
-            meta instanceof SkipSelf || meta.ngMetadataName === 'SkipSelf' || meta === SkipSelf) {
-          flags |= InjectFlags.SkipSelf;
-        } else if (meta instanceof Self || meta.ngMetadataName === 'Self' || meta === Self) {
-          flags |= InjectFlags.Self;
-        } else if (meta instanceof Inject || meta === Inject) {
-          type = meta.token;
+        const flag = getInjectFlag(meta);
+        if (typeof flag === 'number') {
+          // Special case when we handle @Inject decorator.
+          if (flag === DecoratorFlags.Inject) {
+            type = meta.token;
+          } else {
+            flags |= flag;
+          }
         } else {
           type = meta;
         }
       }
 
-      args.push(ɵɵinject(type !, flags));
+      args.push(ɵɵinject(type!, flags));
     } else {
       args.push(ɵɵinject(arg));
     }
@@ -194,25 +176,33 @@ export function injectArgs(types: (Type<any>| InjectionToken<any>| any[])[]): an
   return args;
 }
 
-
-export class NullInjector implements Injector {
-  get(token: any, notFoundValue: any = THROW_IF_NOT_FOUND): any {
-    if (notFoundValue === THROW_IF_NOT_FOUND) {
-      // Intentionally left behind: With dev tools open the debugger will stop here. There is no
-      // reason why correctly written application should cause this exception.
-      // TODO(misko): uncomment the next line once `ngDevMode` works with closure.
-      // if (ngDevMode) debugger;
-      const error = new Error(`NullInjectorError: No provider for ${stringify(token)}!`);
-      error.name = 'NullInjectorError';
-      throw error;
-    }
-    return notFoundValue;
-  }
+/**
+ * Attaches a given InjectFlag to a given decorator using monkey-patching.
+ * Since DI decorators can be used in providers `deps` array (when provider is configured using
+ * `useFactory`) without initialization (e.g. `Host`) and as an instance (e.g. `new Host()`), we
+ * attach the flag to make it available both as a static property and as a field on decorator
+ * instance.
+ *
+ * @param decorator Provided DI decorator.
+ * @param flag InjectFlag that should be applied.
+ */
+export function attachInjectFlag(decorator: any, flag: InternalInjectFlags|DecoratorFlags): any {
+  decorator[DI_DECORATOR_FLAG] = flag;
+  decorator.prototype[DI_DECORATOR_FLAG] = flag;
+  return decorator;
 }
 
+/**
+ * Reads monkey-patched property that contains InjectFlag attached to a decorator.
+ *
+ * @param token Token that may contain monkey-patched DI flags property.
+ */
+export function getInjectFlag(token: any): number|undefined {
+  return token[DI_DECORATOR_FLAG];
+}
 
 export function catchInjectorError(
-    e: any, token: any, injectorErrorName: string, source: string | null): never {
+    e: any, token: any, injectorErrorName: string, source: string|null): never {
   const tokenPath: any[] = e[NG_TEMP_TOKEN_PATH];
   if (token[SOURCE]) {
     tokenPath.unshift(token[SOURCE]);
@@ -224,10 +214,10 @@ export function catchInjectorError(
 }
 
 export function formatError(
-    text: string, obj: any, injectorErrorName: string, source: string | null = null): string {
-  text = text && text.charAt(0) === '\n' && text.charAt(1) == NO_NEW_LINE ? text.substr(2) : text;
+    text: string, obj: any, injectorErrorName: string, source: string|null = null): string {
+  text = text && text.charAt(0) === '\n' && text.charAt(1) == NO_NEW_LINE ? text.slice(2) : text;
   let context = stringify(obj);
-  if (obj instanceof Array) {
+  if (Array.isArray(obj)) {
     context = obj.map(stringify).join(' -> ');
   } else if (typeof obj === 'object') {
     let parts = <string[]>[];
@@ -240,5 +230,6 @@ export function formatError(
     }
     context = `{${parts.join(', ')}}`;
   }
-  return `${injectorErrorName}${source ? '(' + source + ')' : ''}[${context}]: ${text.replace(NEW_LINE, '\n  ')}`;
+  return `${injectorErrorName}${source ? '(' + source + ')' : ''}[${context}]: ${
+      text.replace(NEW_LINE, '\n  ')}`;
 }

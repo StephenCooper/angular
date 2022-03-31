@@ -1,20 +1,23 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {APP_BASE_HREF, HashLocationStrategy, LOCATION_INITIALIZED, Location, LocationStrategy, PathLocationStrategy, PlatformLocation, ViewportScroller, ɵgetDOM as getDOM} from '@angular/common';
-import {ANALYZE_FOR_ENTRY_COMPONENTS, APP_BOOTSTRAP_LISTENER, APP_INITIALIZER, ApplicationRef, Compiler, ComponentRef, Inject, Injectable, InjectionToken, Injector, ModuleWithProviders, NgModule, NgModuleFactoryLoader, NgProbeToken, Optional, Provider, SkipSelf, SystemJsNgModuleLoader} from '@angular/core';
-import {Subject, of } from 'rxjs';
+import {APP_BASE_HREF, HashLocationStrategy, Location, LOCATION_INITIALIZED, LocationStrategy, PathLocationStrategy, PlatformLocation, ViewportScroller} from '@angular/common';
+import {ANALYZE_FOR_ENTRY_COMPONENTS, APP_BOOTSTRAP_LISTENER, APP_INITIALIZER, ApplicationRef, Compiler, ComponentRef, Inject, Injectable, InjectionToken, Injector, ModuleWithProviders, NgModule, NgProbeToken, OnDestroy, Optional, Provider, SkipSelf} from '@angular/core';
+import {Title} from '@angular/platform-browser';
+import {of, Subject} from 'rxjs';
+
 import {EmptyOutletComponent} from './components/empty_outlet';
-import {Route, Routes} from './config';
 import {RouterLink, RouterLinkWithHref} from './directives/router_link';
 import {RouterLinkActive} from './directives/router_link_active';
 import {RouterOutlet} from './directives/router_outlet';
 import {Event} from './events';
+import {Route, Routes} from './models';
+import {DefaultTitleStrategy, TitleStrategy} from './page_title_strategy';
 import {RouteReuseStrategy} from './route_reuse_strategy';
 import {ErrorHandler, Router} from './router';
 import {ROUTES} from './router_config_loader';
@@ -51,14 +54,13 @@ export const ROUTER_PROVIDERS: Provider[] = [
     provide: Router,
     useFactory: setupRouter,
     deps: [
-      ApplicationRef, UrlSerializer, ChildrenOutletContexts, Location, Injector,
-      NgModuleFactoryLoader, Compiler, ROUTES, ROUTER_CONFIGURATION,
+      UrlSerializer, ChildrenOutletContexts, Location, Injector, Compiler, ROUTES,
+      ROUTER_CONFIGURATION, DefaultTitleStrategy, [TitleStrategy, new Optional()],
       [UrlHandlingStrategy, new Optional()], [RouteReuseStrategy, new Optional()]
     ]
   },
   ChildrenOutletContexts,
   {provide: ActivatedRoute, useFactory: rootRoute, deps: [Router]},
-  {provide: NgModuleFactoryLoader, useClass: SystemJsNgModuleLoader},
   RouterPreloader,
   NoPreloading,
   PreloadAllModules,
@@ -70,60 +72,29 @@ export function routerNgProbeToken() {
 }
 
 /**
- * @usageNotes
- *
- * RouterModule can be imported multiple times: once per lazily-loaded bundle.
- * Since the router deals with a global shared resource--location, we cannot have
- * more than one router service active.
- *
- * That is why there are two ways to create the module: `RouterModule.forRoot` and
- * `RouterModule.forChild`.
- *
- * * `forRoot` creates a module that contains all the directives, the given routes, and the router
- *   service itself.
- * * `forChild` creates a module that contains all the directives and the given routes, but does not
- *   include the router service.
- *
- * When registered at the root, the module should be used as follows
- *
- * ```
- * @NgModule({
- *   imports: [RouterModule.forRoot(ROUTES)]
- * })
- * class MyNgModule {}
- * ```
- *
- * For submodules and lazy loaded submodules the module should be used as follows:
- *
- * ```
- * @NgModule({
- *   imports: [RouterModule.forChild(ROUTES)]
- * })
- * class MyNgModule {}
- * ```
- *
  * @description
  *
- * Adds router directives and providers.
+ * Adds directives and providers for in-app navigation among views defined in an application.
+ * Use the Angular `Router` service to declaratively specify application states and manage state
+ * transitions.
  *
- * Managing state transitions is one of the hardest parts of building applications. This is
- * especially true on the web, where you also need to ensure that the state is reflected in the URL.
- * In addition, we often want to split applications into multiple bundles and load them on demand.
- * Doing this transparently is not trivial.
+ * You can import this NgModule multiple times, once for each lazy-loaded bundle.
+ * However, only one `Router` service can be active.
+ * To ensure this, there are two ways to register routes when importing this module:
  *
- * The Angular router service solves these problems. Using the router, you can declaratively specify
- * application states, manage state transitions while taking care of the URL, and load bundles on
- * demand.
+ * * The `forRoot()` method creates an `NgModule` that contains all the directives, the given
+ * routes, and the `Router` service itself.
+ * * The `forChild()` method creates an `NgModule` that contains all the directives and the given
+ * routes, but does not include the `Router` service.
  *
- * @see [Routing and Navigation](guide/router.html) for an
- * overview of how the router service should be used.
+ * @see [Routing and Navigation guide](guide/router) for an
+ * overview of how the `Router` service should be used.
  *
  * @publicApi
  */
 @NgModule({
   declarations: ROUTER_DIRECTIVES,
   exports: ROUTER_DIRECTIVES,
-  entryComponents: [EmptyOutletComponent]
 })
 export class RouterModule {
   // Note: We are injecting the Router so it gets created eagerly...
@@ -133,10 +104,20 @@ export class RouterModule {
    * Creates and configures a module with all the router providers and directives.
    * Optionally sets up an application listener to perform an initial navigation.
    *
+   * When registering the NgModule at the root, import as follows:
+   *
+   * ```
+   * @NgModule({
+   *   imports: [RouterModule.forRoot(ROUTES)]
+   * })
+   * class MyNgModule {}
+   * ```
+   *
    * @param routes An array of `Route` objects that define the navigation paths for the application.
    * @param config An `ExtraOptions` configuration object that controls how navigation is performed.
-   * @return The new router module.
-  */
+   * @return The new `NgModule`.
+   *
+   */
   static forRoot(routes: Routes, config?: ExtraOptions): ModuleWithProviders<RouterModule> {
     return {
       ngModule: RouterModule,
@@ -152,9 +133,8 @@ export class RouterModule {
         {
           provide: LocationStrategy,
           useFactory: provideLocationStrategy,
-          deps: [
-            PlatformLocation, [new Inject(APP_BASE_HREF), new Optional()], ROUTER_CONFIGURATION
-          ]
+          deps:
+              [PlatformLocation, [new Inject(APP_BASE_HREF), new Optional()], ROUTER_CONFIGURATION]
         },
         {
           provide: RouterScroller,
@@ -173,7 +153,20 @@ export class RouterModule {
   }
 
   /**
-   * Creates a module with all the router directives and a provider registering routes.
+   * Creates a module with all the router directives and a provider registering routes,
+   * without creating a new Router service.
+   * When registering for submodules and lazy-loaded submodules, create the NgModule as follows:
+   *
+   * ```
+   * @NgModule({
+   *   imports: [RouterModule.forChild(ROUTES)]
+   * })
+   * class MyNgModule {}
+   * ```
+   *
+   * @param routes An array of `Route` objects that define the navigation paths for the submodule.
+   * @return The new NgModule.
+   *
    */
   static forChild(routes: Routes): ModuleWithProviders<RouterModule> {
     return {ngModule: RouterModule, providers: [provideRoutes(routes)]};
@@ -195,7 +188,7 @@ export function provideLocationStrategy(
 }
 
 export function provideForRootGuard(router: Router): any {
-  if (router) {
+  if ((typeof ngDevMode === 'undefined' || ngDevMode) && router) {
     throw new Error(
         `RouterModule.forRoot() called twice. Lazy loaded modules should use RouterModule.forChild() instead.`);
   }
@@ -229,32 +222,34 @@ export function provideRoutes(routes: Routes): any {
  * Allowed values in an `ExtraOptions` object that configure
  * when the router performs the initial navigation operation.
  *
- * * 'enabled' - The initial navigation starts before the root component is created.
+ * * 'enabledNonBlocking' - (default) The initial navigation starts after the
+ * root component has been created. The bootstrap is not blocked on the completion of the initial
+ * navigation.
+ * * 'enabledBlocking' - The initial navigation starts before the root component is created.
  * The bootstrap is blocked until the initial navigation is complete. This value is required
  * for [server-side rendering](guide/universal) to work.
  * * 'disabled' - The initial navigation is not performed. The location listener is set up before
  * the root component gets created. Use if there is a reason to have
  * more control over when the router starts its initial navigation due to some complex
  * initialization logic.
- * * 'legacy_enabled'- (Default, for compatibility.) The initial navigation starts after the root component has been created.
- * The bootstrap is not blocked until the initial navigation is complete. @deprecated
- * * 'legacy_disabled'- The initial navigation is not performed. The location listener is set up
- * after the root component gets created. @deprecated since v4
- * * `true` - same as 'legacy_enabled'. @deprecated since v4
- * * `false` - same as 'legacy_disabled'. @deprecated since v4
  *
- * The 'legacy_enabled' and 'legacy_disabled' should not be used for new applications.
+ * The following values have been [deprecated](guide/releases#deprecation-practices) since v11,
+ * and should not be used for new applications.
+ *
+ * * 'enabled' - This option is 1:1 replaceable with `enabledBlocking`.
  *
  * @see `forRoot()`
  *
  * @publicApi
  */
-export type InitialNavigation =
-    true | false | 'enabled' | 'disabled' | 'legacy_enabled' | 'legacy_disabled';
+export type InitialNavigation = 'disabled'|'enabled'|'enabledBlocking'|'enabledNonBlocking';
 
 /**
  * A set of configuration options for a router module, provided in the
  * `forRoot()` method.
+ *
+ * @see `forRoot()`
+ *
  *
  * @publicApi
  */
@@ -272,29 +267,23 @@ export interface ExtraOptions {
   useHash?: boolean;
 
   /**
-   * One of `enabled` or `disabled`.
-   * When set to `enabled`, the initial navigation starts before the root component is created.
-   * The bootstrap is blocked until the initial navigation is complete. This value is required for
-   * [server-side rendering](guide/universal) to work.
-   * When set to `disabled`, the initial navigation is not performed.
-   * The location listener is set up before the root component gets created.
-   * Use if there is a reason to have more control over when the router
+   * One of `enabled`, `enabledBlocking`, `enabledNonBlocking` or `disabled`.
+   * When set to `enabled` or `enabledBlocking`, the initial navigation starts before the root
+   * component is created. The bootstrap is blocked until the initial navigation is complete. This
+   * value is required for [server-side rendering](guide/universal) to work. When set to
+   * `enabledNonBlocking`, the initial navigation starts after the root component has been created.
+   * The bootstrap is not blocked on the completion of the initial navigation. When set to
+   * `disabled`, the initial navigation is not performed. The location listener is set up before the
+   * root component gets created. Use if there is a reason to have more control over when the router
    * starts its initial navigation due to some complex initialization logic.
-   *
-   * Legacy values are deprecated since v4 and should not be used for new applications:
-   *
-   * * `legacy_enabled` - Default for compatibility.
-   * The initial navigation starts after the root component has been created,
-   * but the bootstrap is not blocked until the initial navigation is complete.
-   * * `legacy_disabled` - The initial navigation is not performed.
-   * The location listener is set up after the root component gets created.
-   * * `true` - same as `legacy_enabled`.
-   * * `false` - same as `legacy_disabled`.
    */
   initialNavigation?: InitialNavigation;
 
   /**
    * A custom error handler for failed navigations.
+   * If the handler returns a value, the navigation Promise is resolved with this value.
+   * If the handler throws an exception, the navigation Promise is rejected with the exception.
+   *
    */
   errorHandler?: ErrorHandler;
 
@@ -371,7 +360,15 @@ export interface ExtraOptions {
    * Defines how the router merges parameters, data, and resolved data from parent to child
    * routes. By default ('emptyOnly'), inherits parent parameters only for
    * path-less or component-less routes.
+   *
    * Set to 'always' to enable unconditional inheritance of parent parameters.
+   *
+   * Note that when dealing with matrix parameters, "parent" refers to the parent `Route`
+   * config which does not necessarily mean the "URL segment to the left". When the `Route` `path`
+   * contains multiple segments, the matrix parameters must appear on the last segment. For example,
+   * matrix parameters for `{path: 'a/b', component: MyComp}` should appear as `a/b;foo=bar` and not
+   * `a;foo=bar/b`.
+   *
    */
   paramsInheritanceStrategy?: 'emptyOnly'|'always';
 
@@ -414,7 +411,9 @@ export interface ExtraOptions {
    * ];
    * ```
    *
-   * From the `ContainerComponent`, this will not work:
+   * From the `ContainerComponent`, you should be able to navigate to `AComponent` using
+   * the following `routerLink`, but it will not work if `relativeLinkResolution` is set
+   * to `'legacy'`:
    *
    * `<a [routerLink]="['./a']">Link to A</a>`
    *
@@ -422,19 +421,46 @@ export interface ExtraOptions {
    *
    * `<a [routerLink]="['../a']">Link to A</a>`
    *
-   * In other words, you're required to use `../` rather than `./`. This is currently the default
-   * behavior. Setting this option to `corrected` enables the fix.
+   * In other words, you're required to use `../` rather than `./` when the relative link
+   * resolution is set to `'legacy'`.
+   *
+   * The default in v11 is `corrected`.
+   *
+   * @deprecated
    */
   relativeLinkResolution?: 'legacy'|'corrected';
+
+  /**
+   * Configures how the Router attempts to restore state when a navigation is cancelled.
+   *
+   * 'replace' - Always uses `location.replaceState` to set the browser state to the state of the
+   * router before the navigation started. This means that if the URL of the browser is updated
+   * _before_ the navigation is canceled, the Router will simply replace the item in history rather
+   * than trying to restore to the previous location in the session history. This happens most
+   * frequently with `urlUpdateStrategy: 'eager'` and navigations with the browser back/forward
+   * buttons.
+   *
+   * 'computed' - Will attempt to return to the same index in the session history that corresponds
+   * to the Angular route when the navigation gets cancelled. For example, if the browser back
+   * button is clicked and the navigation is cancelled, the Router will trigger a forward navigation
+   * and vice versa.
+   *
+   * Note: the 'computed' option is incompatible with any `UrlHandlingStrategy` which only
+   * handles a portion of the URL because the history restoration navigates to the previous place in
+   * the browser history rather than simply resetting a portion of the URL.
+   *
+   * The default value is `replace` when not set.
+   */
+  canceledNavigationResolution?: 'replace'|'computed';
 }
 
 export function setupRouter(
-    ref: ApplicationRef, urlSerializer: UrlSerializer, contexts: ChildrenOutletContexts,
-    location: Location, injector: Injector, loader: NgModuleFactoryLoader, compiler: Compiler,
-    config: Route[][], opts: ExtraOptions = {}, urlHandlingStrategy?: UrlHandlingStrategy,
-    routeReuseStrategy?: RouteReuseStrategy) {
-  const router = new Router(
-      null, urlSerializer, contexts, location, injector, loader, compiler, flatten(config));
+    urlSerializer: UrlSerializer, contexts: ChildrenOutletContexts, location: Location,
+    injector: Injector, compiler: Compiler, config: Route[][], opts: ExtraOptions = {},
+    defaultTitleStrategy: DefaultTitleStrategy, titleStrategy?: TitleStrategy,
+    urlHandlingStrategy?: UrlHandlingStrategy, routeReuseStrategy?: RouteReuseStrategy) {
+  const router =
+      new Router(null, urlSerializer, contexts, location, injector, compiler, flatten(config));
 
   if (urlHandlingStrategy) {
     router.urlHandlingStrategy = urlHandlingStrategy;
@@ -444,22 +470,31 @@ export function setupRouter(
     router.routeReuseStrategy = routeReuseStrategy;
   }
 
+  router.titleStrategy = titleStrategy ?? defaultTitleStrategy;
+
+  assignExtraOptionsToRouter(opts, router);
+
+  if (opts.enableTracing) {
+    router.events.subscribe((e: Event) => {
+      // tslint:disable:no-console
+      console.group?.(`Router Event: ${(<any>e.constructor).name}`);
+      console.log(e.toString());
+      console.log(e);
+      console.groupEnd?.();
+      // tslint:enable:no-console
+    });
+  }
+
+  return router;
+}
+
+export function assignExtraOptionsToRouter(opts: ExtraOptions, router: Router): void {
   if (opts.errorHandler) {
     router.errorHandler = opts.errorHandler;
   }
 
   if (opts.malformedUriErrorHandler) {
     router.malformedUriErrorHandler = opts.malformedUriErrorHandler;
-  }
-
-  if (opts.enableTracing) {
-    const dom = getDOM();
-    router.events.subscribe((e: Event) => {
-      dom.logGroup(`Router Event: ${(<any>e.constructor).name}`);
-      dom.log(e.toString());
-      dom.log(e);
-      dom.logGroupEnd();
-    });
   }
 
   if (opts.onSameUrlNavigation) {
@@ -470,15 +505,17 @@ export function setupRouter(
     router.paramsInheritanceStrategy = opts.paramsInheritanceStrategy;
   }
 
-  if (opts.urlUpdateStrategy) {
-    router.urlUpdateStrategy = opts.urlUpdateStrategy;
-  }
-
   if (opts.relativeLinkResolution) {
     router.relativeLinkResolution = opts.relativeLinkResolution;
   }
 
-  return router;
+  if (opts.urlUpdateStrategy) {
+    router.urlUpdateStrategy = opts.urlUpdateStrategy;
+  }
+
+  if (opts.canceledNavigationResolution) {
+    router.canceledNavigationResolution = opts.canceledNavigationResolution;
+  }
 }
 
 export function rootRoute(router: Router): ActivatedRoute {
@@ -497,8 +534,9 @@ export function rootRoute(router: Router): ActivatedRoute {
  * pauses. It waits for the hook to be resolved. We then resolve it only in a bootstrap listener.
  */
 @Injectable()
-export class RouterInitializer {
-  private initNavigation: boolean = false;
+export class RouterInitializer implements OnDestroy {
+  private initNavigation = false;
+  private destroyed = false;
   private resultOfPreactivationDone = new Subject<void>();
 
   constructor(private injector: Injector) {}
@@ -506,19 +544,22 @@ export class RouterInitializer {
   appInitializer(): Promise<any> {
     const p: Promise<any> = this.injector.get(LOCATION_INITIALIZED, Promise.resolve(null));
     return p.then(() => {
-      let resolve: Function = null !;
+      // If the injector was destroyed, the DI lookups below will fail.
+      if (this.destroyed) {
+        return Promise.resolve(true);
+      }
+
+      let resolve: Function = null!;
       const res = new Promise(r => resolve = r);
       const router = this.injector.get(Router);
       const opts = this.injector.get(ROUTER_CONFIGURATION);
 
-      if (this.isLegacyDisabled(opts) || this.isLegacyEnabled(opts)) {
-        resolve(true);
-
-      } else if (opts.initialNavigation === 'disabled') {
+      if (opts.initialNavigation === 'disabled') {
         router.setUpLocationChangeListener();
         resolve(true);
-
-      } else if (opts.initialNavigation === 'enabled') {
+      } else if (
+          // TODO: enabled is deprecated as of v11, can be removed in v13
+          opts.initialNavigation === 'enabled' || opts.initialNavigation === 'enabledBlocking') {
         router.hooks.afterPreactivation = () => {
           // only the initial navigation should be delayed
           if (!this.initNavigation) {
@@ -528,13 +569,12 @@ export class RouterInitializer {
 
             // subsequent navigations should not be delayed
           } else {
-            return of (null) as any;
+            return of(null) as any;
           }
         };
         router.initialNavigation();
-
       } else {
-        throw new Error(`Invalid initialNavigation options: '${opts.initialNavigation}'`);
+        resolve(true);
       }
 
       return res;
@@ -552,26 +592,20 @@ export class RouterInitializer {
       return;
     }
 
-    if (this.isLegacyEnabled(opts)) {
+    // Default case
+    if (opts.initialNavigation === 'enabledNonBlocking' || opts.initialNavigation === undefined) {
       router.initialNavigation();
-    } else if (this.isLegacyDisabled(opts)) {
-      router.setUpLocationChangeListener();
     }
 
     preloader.setUpPreloading();
     routerScroller.init();
     router.resetRootComponentType(ref.componentTypes[0]);
-    this.resultOfPreactivationDone.next(null !);
+    this.resultOfPreactivationDone.next(null!);
     this.resultOfPreactivationDone.complete();
   }
 
-  private isLegacyEnabled(opts: ExtraOptions): boolean {
-    return opts.initialNavigation === 'legacy_enabled' || opts.initialNavigation === true ||
-        opts.initialNavigation === undefined;
-  }
-
-  private isLegacyDisabled(opts: ExtraOptions): boolean {
-    return opts.initialNavigation === 'legacy_disabled' || opts.initialNavigation === false;
+  ngOnDestroy() {
+    this.destroyed = true;
   }
 }
 
@@ -592,7 +626,7 @@ export function getBootstrapListener(r: RouterInitializer) {
 export const ROUTER_INITIALIZER =
     new InjectionToken<(compRef: ComponentRef<any>) => void>('Router Initializer');
 
-export function provideRouterInitializer() {
+export function provideRouterInitializer(): ReadonlyArray<Provider> {
   return [
     RouterInitializer,
     {

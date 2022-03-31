@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
@@ -9,21 +9,21 @@
 import {MonoTypeOperatorFunction} from 'rxjs';
 import {map} from 'rxjs/operators';
 
-import {LoadedRouterConfig} from '../config';
 import {ActivationEnd, ChildActivationEnd, Event} from '../events';
+import {LoadedRouterConfig} from '../models';
 import {DetachedRouteHandleInternal, RouteReuseStrategy} from '../route_reuse_strategy';
 import {NavigationTransition} from '../router';
 import {ChildrenOutletContexts} from '../router_outlet_context';
-import {ActivatedRoute, ActivatedRouteSnapshot, RouterState, advanceActivatedRoute} from '../router_state';
+import {ActivatedRoute, ActivatedRouteSnapshot, advanceActivatedRoute, RouterState} from '../router_state';
 import {forEach} from '../utils/collection';
-import {TreeNode, nodeChildrenAsMap} from '../utils/tree';
+import {nodeChildrenAsMap, TreeNode} from '../utils/tree';
 
 export const activateRoutes =
     (rootContexts: ChildrenOutletContexts, routeReuseStrategy: RouteReuseStrategy,
      forwardEvent: (evt: Event) => void): MonoTypeOperatorFunction<NavigationTransition> =>
         map(t => {
           new ActivateRoutes(
-              routeReuseStrategy, t.targetRouterState !, t.currentRouterState, forwardEvent)
+              routeReuseStrategy, t.targetRouterState!, t.currentRouterState, forwardEvent)
               .activate(rootContexts);
           return t;
         });
@@ -89,7 +89,9 @@ export class ActivateRoutes {
 
   private deactivateRouteAndItsChildren(
       route: TreeNode<ActivatedRoute>, parentContexts: ChildrenOutletContexts): void {
-    if (this.routeReuseStrategy.shouldDetach(route.value.snapshot)) {
+    // If there is no component, the Route is never attached to an outlet (because there is no
+    // component to attach).
+    if (route.value.component && this.routeReuseStrategy.shouldDetach(route.value.snapshot)) {
       this.detachAndStoreRouteSubtree(route, parentContexts);
     } else {
       this.deactivateRouteAndOutlet(route, parentContexts);
@@ -99,6 +101,13 @@ export class ActivateRoutes {
   private detachAndStoreRouteSubtree(
       route: TreeNode<ActivatedRoute>, parentContexts: ChildrenOutletContexts): void {
     const context = parentContexts.getContext(route.value.outlet);
+    const contexts = context && route.value.component ? context.children : parentContexts;
+    const children: {[outletName: string]: TreeNode<ActivatedRoute>} = nodeChildrenAsMap(route);
+
+    for (const childOutlet of Object.keys(children)) {
+      this.deactivateRouteAndItsChildren(children[childOutlet], contexts);
+    }
+
     if (context && context.outlet) {
       const componentRef = context.outlet.detach();
       const contexts = context.children.onOutletDeactivated();
@@ -109,26 +118,32 @@ export class ActivateRoutes {
   private deactivateRouteAndOutlet(
       route: TreeNode<ActivatedRoute>, parentContexts: ChildrenOutletContexts): void {
     const context = parentContexts.getContext(route.value.outlet);
+    // The context could be `null` if we are on a componentless route but there may still be
+    // children that need deactivating.
+    const contexts = context && route.value.component ? context.children : parentContexts;
+    const children: {[outletName: string]: TreeNode<ActivatedRoute>} = nodeChildrenAsMap(route);
 
-    if (context) {
-      const children: {[outletName: string]: any} = nodeChildrenAsMap(route);
-      const contexts = route.value.component ? context.children : parentContexts;
+    for (const childOutlet of Object.keys(children)) {
+      this.deactivateRouteAndItsChildren(children[childOutlet], contexts);
+    }
 
-      forEach(children, (v: any, k: string) => this.deactivateRouteAndItsChildren(v, contexts));
-
-      if (context.outlet) {
-        // Destroy the component
-        context.outlet.deactivate();
-        // Destroy the contexts for all the outlets that were in the component
-        context.children.onOutletDeactivated();
-      }
+    if (context && context.outlet) {
+      // Destroy the component
+      context.outlet.deactivate();
+      // Destroy the contexts for all the outlets that were in the component
+      context.children.onOutletDeactivated();
+      // Clear the information about the attached component on the context but keep the reference to
+      // the outlet.
+      context.attachRef = null;
+      context.resolver = null;
+      context.route = null;
     }
   }
 
   private activateChildRoutes(
       futureNode: TreeNode<ActivatedRoute>, currNode: TreeNode<ActivatedRoute>|null,
       contexts: ChildrenOutletContexts): void {
-    const children: {[outlet: string]: any} = nodeChildrenAsMap(currNode);
+    const children: {[outlet: string]: TreeNode<ActivatedRoute>} = nodeChildrenAsMap(currNode);
     futureNode.children.forEach(c => {
       this.activateRoutes(c, children[c.value.outlet], contexts);
       this.forwardEvent(new ActivationEnd(c.value.snapshot));
@@ -173,7 +188,9 @@ export class ActivateRoutes {
             // Otherwise attach from `RouterOutlet.ngOnInit` when it is instantiated
             context.outlet.attach(stored.componentRef, stored.route.value);
           }
-          advanceActivatedRouteNodeAndItsChildren(stored.route);
+
+          advanceActivatedRoute(stored.route.value);
+          this.activateChildRoutes(futureNode, null, context.children);
         } else {
           const config = parentLoadedConfig(future.snapshot);
           const cmpFactoryResolver = config ? config.module.componentFactoryResolver : null;
@@ -195,11 +212,6 @@ export class ActivateRoutes {
       }
     }
   }
-}
-
-function advanceActivatedRouteNodeAndItsChildren(node: TreeNode<ActivatedRoute>): void {
-  advanceActivatedRoute(node.value);
-  node.children.forEach(advanceActivatedRouteNodeAndItsChildren);
 }
 
 function parentLoadedConfig(snapshot: ActivatedRouteSnapshot): LoadedRouterConfig|null {

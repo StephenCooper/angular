@@ -1,11 +1,12 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 
+/** @nodoc */
 export interface LocalizeFn {
   (messageParts: TemplateStringsArray, ...expressions: readonly any[]): string;
 
@@ -20,8 +21,25 @@ export interface LocalizeFn {
    * different translations.
    */
   translate?: TranslateFn;
+  /**
+   * The current locale of the translated messages.
+   *
+   * The compile-time translation inliner is able to replace the following code:
+   *
+   * ```
+   * typeof $localize !== "undefined" && $localize.locale
+   * ```
+   *
+   * with a string literal of the current locale. E.g.
+   *
+   * ```
+   * "fr"
+   * ```
+   */
+  locale?: string;
 }
 
+/** @nodoc */
 export interface TranslateFn {
   (messageParts: TemplateStringsArray,
    expressions: readonly any[]): [TemplateStringsArray, readonly any[]];
@@ -50,7 +68,7 @@ export interface TranslateFn {
  * ```
  *
  * This format is the same as that used for `i18n` markers in Angular templates. See the
- * [Angular 18n guide](guide/i18n#template-translations).
+ * [Angular i18n guide](guide/i18n-common-prepare#mark-text-in-component-template).
  *
  * **Naming placeholders**
  *
@@ -114,9 +132,13 @@ export interface TranslateFn {
  * the original template literal string without applying any translations to the parts. This
  * version is used during development or where there is no need to translate the localized
  * template literals.
+ *
  * @param messageParts a collection of the static parts of the template string.
  * @param expressions a collection of the values of each placeholder in the template string.
  * @returns the translated string, with the `messageParts` and `expressions` interleaved together.
+ *
+ * @globalApi
+ * @publicApi
  */
 export const $localize: LocalizeFn = function(
     messageParts: TemplateStringsArray, ...expressions: readonly any[]) {
@@ -143,25 +165,12 @@ const BLOCK_MARKER = ':';
  * escaped with a backslash, `\:`. This function checks for this by looking at the `raw`
  * messagePart, which should still contain the backslash.
  *
- * ---
- *
- * If the template literal was synthesized and downleveled by TypeScript to ES5 then its
- * raw array will only contain empty strings. This is because the current TypeScript compiler uses
- * the original source code to find the raw text and in the case of synthesized AST nodes, there is
- * no source code to draw upon.
- *
- * The workaround in this function is to assume that the template literal did not contain an escaped
- * placeholder name, and fall back on checking the cooked array instead.
- * This is a limitation if compiling to ES5 in TypeScript but is not a problem if the TypeScript
- * output is ES2015 and the code is downleveled by a separate tool as happens in the Angular CLI.
- *
  * @param messagePart The cooked message part to process.
  * @param rawMessagePart The raw message part to check.
  * @returns the message part with the placeholder name stripped, if found.
  * @throws an error if the block is unterminated
  */
 function stripBlock(messagePart: string, rawMessagePart: string) {
-  rawMessagePart = rawMessagePart || messagePart;
   return rawMessagePart.charAt(0) === BLOCK_MARKER ?
       messagePart.substring(findEndOfBlock(messagePart, rawMessagePart) + 1) :
       messagePart;

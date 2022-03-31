@@ -1,16 +1,17 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 import {bindingUpdated} from '../bindings';
+import {TNode} from '../interfaces/node';
 import {SanitizerFn} from '../interfaces/sanitization';
-import {BINDING_INDEX, TVIEW} from '../interfaces/view';
-import {getLView, getSelectedIndex} from '../state';
+import {LView, RENDERER, TView} from '../interfaces/view';
+import {getLView, getSelectedTNode, getTView, nextBindingIndex} from '../state';
 
-import {TsickleIssue1009, elementPropertyInternal, storePropertyBindingMetadata} from './shared';
+import {elementPropertyInternal, setInputsForProperty, storePropertyBindingMetadata} from './shared';
 
 
 /**
@@ -32,13 +33,27 @@ import {TsickleIssue1009, elementPropertyInternal, storePropertyBindingMetadata}
  * @codeGenApi
  */
 export function ɵɵproperty<T>(
-    propName: string, value: T, sanitizer?: SanitizerFn | null): TsickleIssue1009 {
+    propName: string, value: T, sanitizer?: SanitizerFn|null): typeof ɵɵproperty {
   const lView = getLView();
-  const bindingIndex = lView[BINDING_INDEX]++;
+  const bindingIndex = nextBindingIndex();
   if (bindingUpdated(lView, bindingIndex, value)) {
-    const nodeIndex = getSelectedIndex();
-    elementPropertyInternal(lView, nodeIndex, propName, value, sanitizer);
-    ngDevMode && storePropertyBindingMetadata(lView[TVIEW].data, nodeIndex, propName, bindingIndex);
+    const tView = getTView();
+    const tNode = getSelectedTNode();
+    elementPropertyInternal(
+        tView, tNode, lView, propName, value, lView[RENDERER], sanitizer, false);
+    ngDevMode && storePropertyBindingMetadata(tView.data, tNode, propName, bindingIndex);
   }
   return ɵɵproperty;
+}
+
+/**
+ * Given `<div style="..." my-dir>` and `MyDir` with `@Input('style')` we need to write to
+ * directive input.
+ */
+export function setDirectiveInputsWhichShadowsStyling(
+    tView: TView, tNode: TNode, lView: LView, value: any, isClassBased: boolean) {
+  const inputs = tNode.inputs!;
+  const property = isClassBased ? 'class' : 'style';
+  // We support both 'class' and `className` hence the fallback.
+  setInputsForProperty(tView, lView, inputs[property], property, value);
 }

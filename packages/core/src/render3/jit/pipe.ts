@@ -1,12 +1,12 @@
 /**
  * @license
- * Copyright Google Inc. All Rights Reserved.
+ * Copyright Google LLC All Rights Reserved.
  *
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {R3PipeMetadataFacade, getCompilerFacade} from '../../compiler/compiler_facade';
+import {getCompilerFacade, JitCompilerUsage, R3PipeMetadataFacade} from '../../compiler/compiler_facade';
 import {reflectDependencies} from '../../di/jit/util';
 import {Type} from '../../interface/type';
 import {Pipe} from '../../metadata/directives';
@@ -22,9 +22,15 @@ export function compilePipe(type: Type<any>, meta: Pipe): void {
     get: () => {
       if (ngFactoryDef === null) {
         const metadata = getPipeMetadata(type, meta);
-        ngFactoryDef = getCompilerFacade().compileFactory(
-            angularCoreEnv, `ng:///${metadata.name}/ngFactoryDef.js`,
-            {...metadata, injectFn: 'directiveInject', isPipe: true});
+        const compiler = getCompilerFacade(
+            {usage: JitCompilerUsage.Decorator, kind: 'pipe', type: metadata.type});
+        ngFactoryDef = compiler.compileFactory(angularCoreEnv, `ng:///${metadata.name}/ɵfac.js`, {
+          name: metadata.name,
+          type: metadata.type,
+          typeArgumentCount: 0,
+          deps: reflectDependencies(type),
+          target: compiler.FactoryTarget.Pipe
+        });
       }
       return ngFactoryDef;
     },
@@ -36,8 +42,10 @@ export function compilePipe(type: Type<any>, meta: Pipe): void {
     get: () => {
       if (ngPipeDef === null) {
         const metadata = getPipeMetadata(type, meta);
-        ngPipeDef = getCompilerFacade().compilePipe(
-            angularCoreEnv, `ng:///${metadata.name}/ngPipeDef.js`, metadata);
+        const compiler = getCompilerFacade(
+            {usage: JitCompilerUsage.Decorator, kind: 'pipe', type: metadata.type});
+        ngPipeDef =
+            compiler.compilePipe(angularCoreEnv, `ng:///${metadata.name}/ɵpipe.js`, metadata);
       }
       return ngPipeDef;
     },
@@ -49,10 +57,11 @@ export function compilePipe(type: Type<any>, meta: Pipe): void {
 function getPipeMetadata(type: Type<any>, meta: Pipe): R3PipeMetadataFacade {
   return {
     type: type,
-    typeArgumentCount: 0,
     name: type.name,
-    deps: reflectDependencies(type),
     pipeName: meta.name,
-    pure: meta.pure !== undefined ? meta.pure : true
+    pure: meta.pure !== undefined ? meta.pure : true,
+    // TODO(alxhub): pass through the standalone flag from the pipe metadata once standalone
+    // functionality is fully rolled out.
+    isStandalone: false,
   };
 }
